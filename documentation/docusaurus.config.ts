@@ -7,6 +7,10 @@ const config: Config = {
   title: 'Dep-Scan',
   tagline: 'Next generation security audit',
   favicon: 'img/dep-scan-large.png',
+  themes: ['@docusaurus/theme-mermaid'],
+  markdown:{
+    mermaid: true,
+  },
 
   url: 'https://depscan.readthedocs.io/',
   baseUrl: '/',
