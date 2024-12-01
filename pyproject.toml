@@ -51,7 +51,8 @@ dev = ["black",
     "flake8",
     "pytest",
     "pytest-cov",
-    "httpretty"
+    "httpretty",
+    "coverage",
 ]
 perf = ["hishel[redis]"]
 
