@@ -2,17 +2,20 @@ name: CSAF Demo
 
 on:
   workflow_dispatch:
-
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - name: Display Python version
       run: python -c "import sys; print(sys.version)"
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      with:
+        persist-credentials: false
     - name: Install uv
-      uses: astral-sh/setup-uv@v5
-    - uses: oras-project/setup-oras@v1
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+    - uses: oras-project/setup-oras@38de303aac69abb66f3e6255b7198bff35f323e3  # v2.0.0
     - name: Install dependencies
       env:
         VDB_HOME: "/home/runner/work/vdb_data"
@@ -41,7 +44,7 @@ jobs:
       run: |
         source venv/bin/activate
         check-jsonschema --schemafile /home/runner/work/dep-scan/dep-scan/vuln_spring/csaf_schema.json /home/runner/work/dep-scan/dep-scan/vuln_spring/reports/csaf_v2.json
-    - uses: actions/upload-artifact@v1
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         path: "./vuln_spring"
         name: vuln_spring
