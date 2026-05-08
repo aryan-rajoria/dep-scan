@@ -1,22 +1,21 @@
 import contextlib
-import json
 import ipaddress
-import socket
-from hmac import compare_digest
+import json
 import os
+import socket
 import tempfile
+from hmac import compare_digest
 from urllib.parse import urlparse
 
+from analysis_lib import VdrAnalysisKV
+from analysis_lib.utils import get_pkg_list
+from analysis_lib.vdr import VDRAnalyzer
 from custom_json_diff.lib.utils import file_write
-from quart import request, Quart
+from quart import Quart, request
 from rich.console import Console
+from server_lib import ServerOptions
 from vdb.lib import search
 from vdb.lib.npm import NpmSource
-
-from analysis_lib import VdrAnalysisKV
-from analysis_lib.vdr import VDRAnalyzer
-from analysis_lib.utils import get_pkg_list
-from server_lib import ServerOptions
 
 app = Quart(f"dep-scan server ({__name__})", static_folder=None)
 app.config.from_prefixed_env(prefix="DEPSCAN_SERVER")
@@ -56,6 +55,8 @@ console = Console(
 MAX_PROJECT_TYPES = 32
 MAX_PROJECT_TYPE_LENGTH = 64
 DEFAULT_MAX_BOM_FILE_SIZE = 100 * 1024 * 1024
+
+UPLOAD_SIZE_LIMIT_MESSAGE = "BOM file exceeds the configured size limit."
 
 
 def _is_truthy(value):
@@ -172,7 +173,7 @@ def _parse_project_types(project_type_value: str) -> list[str]:
 def _load_bom_data(bom_file_path: str, max_bytes: int):
     try:
         if max_bytes and os.path.getsize(bom_file_path) > max_bytes:
-            return None, "BOM file exceeds the configured size limit."
+            return None, UPLOAD_SIZE_LIMIT_MESSAGE
         with open(bom_file_path, encoding="utf-8") as bom_fp:
             bom_data = json.load(bom_fp)
     except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
@@ -180,6 +181,40 @@ def _load_bom_data(bom_file_path: str, max_bytes: int):
     if not isinstance(bom_data, dict) or bom_data.get("bomFormat") != "CycloneDX":
         return None, "Uploaded file is not a valid CycloneDX BOM."
     return bom_data, ""
+
+
+def _read_upload_with_limit(upload, max_bytes: int):
+    declared_size = getattr(upload, "content_length", None)
+    if declared_size not in (None, ""):
+        with contextlib.suppress(TypeError, ValueError):
+            if max_bytes and int(declared_size) > max_bytes:
+                return None, UPLOAD_SIZE_LIMIT_MESSAGE
+
+    stream = getattr(upload, "stream", None) or upload
+    reader = getattr(stream, "read", None)
+    if not callable(reader):
+        return None, "Unable to read uploaded file."
+
+    if not max_bytes:
+        return reader(), ""
+
+    max_bytes = int(max_bytes)
+    bytes_remaining = max_bytes + 1
+    chunks = []
+    while bytes_remaining > 0:
+        chunk = reader(min(65536, bytes_remaining))
+        if not chunk:
+            break
+        if isinstance(chunk, str):
+            chunk = chunk.encode("utf-8")
+        elif not isinstance(chunk, bytes):
+            chunk = bytes(chunk)
+        chunks.append(chunk)
+        bytes_remaining -= len(chunk)
+    upload_content = b"".join(chunks)
+    if len(upload_content) > max_bytes:
+        return None, UPLOAD_SIZE_LIMIT_MESSAGE
+    return upload_content, ""
 
 
 def _get_request_api_key() -> str | None:
@@ -238,7 +273,7 @@ async def enforce_allowlists():
                 path = request.args.get("path")
             elif request.method == "POST":
                 json_data = await request.get_json(silent=True)
-                if json_data and "path" in json_data:
+                if isinstance(json_data, dict) and "path" in json_data:
                     path = json_data["path"]
             if path:
                 if not _is_allowed_scan_path(path, allowed_paths):
@@ -265,7 +300,9 @@ async def run_scan():
     """
     logger_instance = app.config.get("LOGGER_INSTANCE")
     q = request.args
-    params = await request.get_json(silent=True) or {}
+    params = await request.get_json(silent=True)
+    if not isinstance(params, dict):
+        params = {}
     uploaded_bom_file = await request.files
     create_bom = app.config.get("create_bom")
     allow_private_urls = _is_truthy(app.config.get("ALLOW_PRIVATE_URLS"))
@@ -336,7 +373,30 @@ async def run_scan():
                 400,
                 {"Content-Type": "application/json"},
             )
-        bom_file_content = bom_file.read().decode("utf-8")
+        bom_file_content_raw, bom_read_error = _read_upload_with_limit(bom_file, max_bom_file_size)
+        if bom_read_error:
+            return (
+                {
+                    "error": "true",
+                    "message": bom_read_error,
+                },
+                400,
+                {"Content-Type": "application/json"},
+            )
+        if isinstance(bom_file_content_raw, bytes):
+            try:
+                bom_file_content = bom_file_content_raw.decode("utf-8")
+            except UnicodeDecodeError:
+                return (
+                    {
+                        "error": "true",
+                        "message": "The uploaded file must be valid UTF-8 JSON.",
+                    },
+                    400,
+                    {"Content-Type": "application/json"},
+                )
+        else:
+            bom_file_content = str(bom_file_content_raw)
         try:
             bom_data = json.loads(bom_file_content)
             if not isinstance(bom_data, dict) or bom_data.get("bomFormat") != "CycloneDX":
