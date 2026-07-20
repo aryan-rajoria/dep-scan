@@ -1,5 +1,7 @@
 import json
 import os
+import time
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -8,7 +10,7 @@ from depscan.lib.bom import get_pkg_list
 from depscan.lib.package_query.pkg_query import (
     calculate_risk_score,
     get_category_score, )
-from depscan.lib.package_query.metadata import npm_metadata, pypi_metadata
+from depscan.lib.package_query.metadata import npm_metadata, pypi_metadata, metadata_from_registry
 from depscan.lib.package_query.pypi_pkg import pypi_pkg_risk
 from depscan.lib.package_query.npm_pkg import npm_pkg_risk
 
@@ -330,3 +332,100 @@ def test_query_metadata2():
     pkg_list = get_pkg_list(test_bom)
     metadata_dict = pypi_metadata({}, pkg_list, None)
     assert metadata_dict
+
+
+# ---------------------------------------------------------------------------
+# T3 — parallel registry audit
+# ---------------------------------------------------------------------------
+
+
+def _make_mock_response(json_data, status_code=200):
+    r = MagicMock()
+    r.status_code = status_code
+    r.json.return_value = json_data
+    return r
+
+
+def _make_mock_client(delay=0):
+    """Return a mock HTTP client whose .get returns canned npm metadata."""
+    npm_meta = {
+        "name": "lodash",
+        "versions": {"4.17.20": {}},
+        "dist-tags": {"latest": "4.17.21"},
+        "time": {"created": "2012-04-25T15:20:00.000Z", "modified": "2021-05-07T00:00:00.000Z"},
+        "maintainers": [{"name": "jd", "email": "x@y.com"}],
+        "license": "MIT",
+    }
+
+    client = MagicMock()
+    def _get(url, **kwargs):
+        if delay:
+            time.sleep(delay)
+        return _make_mock_response(npm_meta)
+    client.get.side_effect = _get
+    # metadata_from_registry uses `with httpx.Client() as client:`
+    client.__enter__.return_value = client
+    client.__exit__.return_value = False
+    return client
+
+
+def test_parallel_metadata_preserves_result_shape():
+    """The parallel audit returns the same dict shape as the serial path."""
+    pkg_list = [
+        {"name": f"pkg-{i}", "vendor": "", "scope": "required", "purl": f"pkg:npm/pkg-{i}@1.0.0"}
+        for i in range(12)
+    ]
+    with patch(
+        "depscan.lib.package_query.metadata.httpx.Client",
+        return_value=_make_mock_client(),
+    ):
+        result = metadata_from_registry("npm", {}, pkg_list)
+    assert len(result) == 12
+    for key, entry in result.items():
+        assert set(entry.keys()) == {
+            "scope",
+            "purl",
+            "pkg_metadata",
+            "risk_metrics",
+            "is_private_pkg",
+        }
+        assert entry["scope"] == "required"
+
+
+def test_parallel_metadata_circuit_breaker():
+    """The circuit breaker trips and returns {} after max_request_failures."""
+    pkg_list = [
+        {"name": f"fail-{i}", "vendor": "", "scope": "required"}
+        for i in range(20)
+    ]
+    client = MagicMock()
+    client.get.side_effect = ConnectionError("boom")
+    client.__enter__.return_value = client
+    client.__exit__.return_value = False
+    with patch(
+        "depscan.lib.package_query.metadata.httpx.Client",
+        return_value=client,
+    ):
+        result = metadata_from_registry("npm", {}, pkg_list)
+    assert result == {}
+
+
+def test_parallel_metadata_is_faster_than_serial():
+    """Demonstrate wall-clock drop: 20 packages * 50ms each.
+    Serial ≈ 1000ms; parallel (10 workers) ≈ 100ms."""
+    pkg_list = [
+        {"name": f"pkg-{i}", "vendor": "", "scope": "required", "purl": f"pkg:npm/pkg-{i}@1.0.0"}
+        for i in range(20)
+    ]
+    mock_client = _make_mock_client(delay=0.05)
+    with patch(
+        "depscan.lib.package_query.metadata.httpx.Client",
+        return_value=mock_client,
+    ):
+        t0 = time.perf_counter()
+        result = metadata_from_registry("npm", {}, pkg_list)
+        elapsed = time.perf_counter() - t0
+    assert len(result) == 20
+    # 20 requests * 50ms = 1.0s serial. With 10 workers → ~0.1s.
+    # Assert well under the serial bound (leave generous headroom).
+    assert elapsed < 0.6, f"Parallel audit took {elapsed:.2f}s, expected < 0.6s"

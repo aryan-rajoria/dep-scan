@@ -1,0 +1,2037 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "components": [
+    {
+      "type": "library",
+      "name": "lodash",
+      "version": "4.17.20",
+      "purl": "pkg:npm/lodash@4.17.20",
+      "bom-ref": "pkg:npm/lodash@4.17.20"
+    },
+    {
+      "type": "library",
+      "name": "express",
+      "version": "4.17.1",
+      "purl": "pkg:npm/express@4.17.1",
+      "bom-ref": "pkg:npm/express@4.17.1"
+    },
+    {
+      "type": "library",
+      "name": "axios",
+      "version": "0.21.1",
+      "purl": "pkg:npm/axios@0.21.1",
+      "bom-ref": "pkg:npm/axios@0.21.1"
+    },
+    {
+      "type": "library",
+      "name": "minimist",
+      "version": "1.2.5",
+      "purl": "pkg:npm/minimist@1.2.5",
+      "bom-ref": "pkg:npm/minimist@1.2.5"
+    },
+    {
+      "type": "library",
+      "name": "handlebars",
+      "version": "4.7.6",
+      "purl": "pkg:npm/handlebars@4.7.6",
+      "bom-ref": "pkg:npm/handlebars@4.7.6"
+    },
+    {
+      "type": "library",
+      "name": "marked",
+      "version": "1.2.7",
+      "purl": "pkg:npm/marked@1.2.7",
+      "bom-ref": "pkg:npm/marked@1.2.7"
+    },
+    {
+      "type": "library",
+      "name": "moment",
+      "version": "2.29.1",
+      "purl": "pkg:npm/moment@2.29.1",
+      "bom-ref": "pkg:npm/moment@2.29.1"
+    },
+    {
+      "type": "library",
+      "name": "qs",
+      "version": "6.9.6",
+      "purl": "pkg:npm/qs@6.9.6",
+      "bom-ref": "pkg:npm/qs@6.9.6"
+    },
+    {
+      "type": "library",
+      "name": "request",
+      "version": "2.88.2",
+      "purl": "pkg:npm/request@2.88.2",
+      "bom-ref": "pkg:npm/request@2.88.2"
+    },
+    {
+      "type": "library",
+      "name": "debug",
+      "version": "2.6.9",
+      "purl": "pkg:npm/debug@2.6.9",
+      "bom-ref": "pkg:npm/debug@2.6.9"
+    },
+    {
+      "type": "library",
+      "name": "ws",
+      "version": "7.4.3",
+      "purl": "pkg:npm/ws@7.4.3",
+      "bom-ref": "pkg:npm/ws@7.4.3"
+    },
+    {
+      "type": "library",
+      "name": "ini",
+      "version": "1.3.5",
+      "purl": "pkg:npm/ini@1.3.5",
+      "bom-ref": "pkg:npm/ini@1.3.5"
+    },
+    {
+      "type": "library",
+      "name": "chalk",
+      "version": "2.4.2",
+      "purl": "pkg:npm/chalk@2.4.2",
+      "bom-ref": "pkg:npm/chalk@2.4.2"
+    },
+    {
+      "type": "library",
+      "name": "glob",
+      "version": "7.1.6",
+      "purl": "pkg:npm/glob@7.1.6",
+      "bom-ref": "pkg:npm/glob@7.1.6"
+    },
+    {
+      "type": "library",
+      "name": "postcss",
+      "version": "8.2.4",
+      "purl": "pkg:npm/postcss@8.2.4",
+      "bom-ref": "pkg:npm/postcss@8.2.4"
+    },
+    {
+      "type": "library",
+      "name": "tar",
+      "version": "4.4.13",
+      "purl": "pkg:npm/tar@4.4.13",
+      "bom-ref": "pkg:npm/tar@4.4.13"
+    },
+    {
+      "type": "library",
+      "name": "semver",
+      "version": "5.7.1",
+      "purl": "pkg:npm/semver@5.7.1",
+      "bom-ref": "pkg:npm/semver@5.7.1"
+    },
+    {
+      "type": "library",
+      "name": "mime",
+      "version": "1.6.0",
+      "purl": "pkg:npm/mime@1.6.0",
+      "bom-ref": "pkg:npm/mime@1.6.0"
+    },
+    {
+      "type": "library",
+      "name": "jquery",
+      "version": "3.5.1",
+      "purl": "pkg:npm/jquery@3.5.1",
+      "bom-ref": "pkg:npm/jquery@3.5.1"
+    },
+    {
+      "type": "library",
+      "name": "async",
+      "version": "2.6.3",
+      "purl": "pkg:npm/async@2.6.3",
+      "bom-ref": "pkg:npm/async@2.6.3"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0000",
+      "version": "1.0.0",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0000@1.0.0",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0000@1.0.0"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0001",
+      "version": "1.0.1",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0001@1.0.1",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0001@1.0.1"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0002",
+      "version": "1.0.2",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0002@1.0.2",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0002@1.0.2"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0003",
+      "version": "1.0.3",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0003@1.0.3",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0003@1.0.3"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0004",
+      "version": "1.0.4",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0004@1.0.4",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0004@1.0.4"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0005",
+      "version": "1.0.5",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0005@1.0.5",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0005@1.0.5"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0006",
+      "version": "1.0.6",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0006@1.0.6",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0006@1.0.6"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0007",
+      "version": "1.0.7",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0007@1.0.7",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0007@1.0.7"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0008",
+      "version": "1.0.8",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0008@1.0.8",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0008@1.0.8"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0009",
+      "version": "1.0.9",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0009@1.0.9",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0009@1.0.9"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0010",
+      "version": "1.0.10",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0010@1.0.10",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0010@1.0.10"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0011",
+      "version": "1.0.11",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0011@1.0.11",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0011@1.0.11"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0012",
+      "version": "1.0.12",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0012@1.0.12",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0012@1.0.12"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0013",
+      "version": "1.0.13",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0013@1.0.13",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0013@1.0.13"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0014",
+      "version": "1.0.14",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0014@1.0.14",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0014@1.0.14"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0015",
+      "version": "1.0.15",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0015@1.0.15",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0015@1.0.15"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0016",
+      "version": "1.0.16",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0016@1.0.16",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0016@1.0.16"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0017",
+      "version": "1.0.17",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0017@1.0.17",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0017@1.0.17"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0018",
+      "version": "1.0.18",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0018@1.0.18",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0018@1.0.18"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0019",
+      "version": "1.0.19",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0019@1.0.19",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0019@1.0.19"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0020",
+      "version": "1.0.20",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0020@1.0.20",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0020@1.0.20"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0021",
+      "version": "1.0.21",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0021@1.0.21",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0021@1.0.21"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0022",
+      "version": "1.0.22",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0022@1.0.22",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0022@1.0.22"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0023",
+      "version": "1.0.23",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0023@1.0.23",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0023@1.0.23"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0024",
+      "version": "1.0.24",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0024@1.0.24",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0024@1.0.24"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0025",
+      "version": "1.0.25",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0025@1.0.25",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0025@1.0.25"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0026",
+      "version": "1.0.26",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0026@1.0.26",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0026@1.0.26"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0027",
+      "version": "1.0.27",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0027@1.0.27",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0027@1.0.27"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0028",
+      "version": "1.0.28",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0028@1.0.28",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0028@1.0.28"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0029",
+      "version": "1.0.29",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0029@1.0.29",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0029@1.0.29"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0030",
+      "version": "1.0.30",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0030@1.0.30",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0030@1.0.30"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0031",
+      "version": "1.0.31",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0031@1.0.31",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0031@1.0.31"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0032",
+      "version": "1.0.32",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0032@1.0.32",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0032@1.0.32"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0033",
+      "version": "1.0.33",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0033@1.0.33",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0033@1.0.33"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0034",
+      "version": "1.0.34",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0034@1.0.34",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0034@1.0.34"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0035",
+      "version": "1.0.35",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0035@1.0.35",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0035@1.0.35"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0036",
+      "version": "1.0.36",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0036@1.0.36",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0036@1.0.36"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0037",
+      "version": "1.0.37",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0037@1.0.37",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0037@1.0.37"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0038",
+      "version": "1.0.38",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0038@1.0.38",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0038@1.0.38"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0039",
+      "version": "1.0.39",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0039@1.0.39",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0039@1.0.39"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0040",
+      "version": "1.0.40",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0040@1.0.40",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0040@1.0.40"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0041",
+      "version": "1.0.41",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0041@1.0.41",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0041@1.0.41"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0042",
+      "version": "1.0.42",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0042@1.0.42",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0042@1.0.42"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0043",
+      "version": "1.0.43",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0043@1.0.43",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0043@1.0.43"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0044",
+      "version": "1.0.44",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0044@1.0.44",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0044@1.0.44"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0045",
+      "version": "1.0.45",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0045@1.0.45",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0045@1.0.45"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0046",
+      "version": "1.0.46",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0046@1.0.46",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0046@1.0.46"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0047",
+      "version": "1.0.47",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0047@1.0.47",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0047@1.0.47"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0048",
+      "version": "1.0.48",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0048@1.0.48",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0048@1.0.48"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0049",
+      "version": "1.0.49",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0049@1.0.49",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0049@1.0.49"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0050",
+      "version": "1.0.50",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0050@1.0.50",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0050@1.0.50"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0051",
+      "version": "1.0.51",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0051@1.0.51",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0051@1.0.51"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0052",
+      "version": "1.0.52",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0052@1.0.52",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0052@1.0.52"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0053",
+      "version": "1.0.53",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0053@1.0.53",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0053@1.0.53"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0054",
+      "version": "1.0.54",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0054@1.0.54",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0054@1.0.54"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0055",
+      "version": "1.0.55",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0055@1.0.55",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0055@1.0.55"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0056",
+      "version": "1.0.56",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0056@1.0.56",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0056@1.0.56"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0057",
+      "version": "1.0.57",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0057@1.0.57",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0057@1.0.57"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0058",
+      "version": "1.0.58",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0058@1.0.58",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0058@1.0.58"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0059",
+      "version": "1.0.59",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0059@1.0.59",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0059@1.0.59"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0060",
+      "version": "1.0.60",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0060@1.0.60",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0060@1.0.60"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0061",
+      "version": "1.0.61",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0061@1.0.61",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0061@1.0.61"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0062",
+      "version": "1.0.62",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0062@1.0.62",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0062@1.0.62"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0063",
+      "version": "1.0.63",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0063@1.0.63",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0063@1.0.63"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0064",
+      "version": "1.0.64",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0064@1.0.64",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0064@1.0.64"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0065",
+      "version": "1.0.65",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0065@1.0.65",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0065@1.0.65"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0066",
+      "version": "1.0.66",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0066@1.0.66",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0066@1.0.66"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0067",
+      "version": "1.0.67",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0067@1.0.67",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0067@1.0.67"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0068",
+      "version": "1.0.68",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0068@1.0.68",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0068@1.0.68"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0069",
+      "version": "1.0.69",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0069@1.0.69",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0069@1.0.69"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0070",
+      "version": "1.0.70",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0070@1.0.70",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0070@1.0.70"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0071",
+      "version": "1.0.71",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0071@1.0.71",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0071@1.0.71"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0072",
+      "version": "1.0.72",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0072@1.0.72",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0072@1.0.72"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0073",
+      "version": "1.0.73",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0073@1.0.73",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0073@1.0.73"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0074",
+      "version": "1.0.74",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0074@1.0.74",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0074@1.0.74"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0075",
+      "version": "1.0.75",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0075@1.0.75",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0075@1.0.75"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0076",
+      "version": "1.0.76",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0076@1.0.76",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0076@1.0.76"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0077",
+      "version": "1.0.77",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0077@1.0.77",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0077@1.0.77"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0078",
+      "version": "1.0.78",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0078@1.0.78",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0078@1.0.78"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0079",
+      "version": "1.0.79",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0079@1.0.79",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0079@1.0.79"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0080",
+      "version": "1.0.80",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0080@1.0.80",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0080@1.0.80"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0081",
+      "version": "1.0.81",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0081@1.0.81",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0081@1.0.81"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0082",
+      "version": "1.0.82",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0082@1.0.82",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0082@1.0.82"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0083",
+      "version": "1.0.83",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0083@1.0.83",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0083@1.0.83"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0084",
+      "version": "1.0.84",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0084@1.0.84",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0084@1.0.84"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0085",
+      "version": "1.0.85",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0085@1.0.85",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0085@1.0.85"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0086",
+      "version": "1.0.86",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0086@1.0.86",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0086@1.0.86"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0087",
+      "version": "1.0.87",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0087@1.0.87",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0087@1.0.87"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0088",
+      "version": "1.0.88",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0088@1.0.88",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0088@1.0.88"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0089",
+      "version": "1.0.89",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0089@1.0.89",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0089@1.0.89"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0090",
+      "version": "1.0.90",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0090@1.0.90",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0090@1.0.90"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0091",
+      "version": "1.0.91",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0091@1.0.91",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0091@1.0.91"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0092",
+      "version": "1.0.92",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0092@1.0.92",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0092@1.0.92"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0093",
+      "version": "1.0.93",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0093@1.0.93",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0093@1.0.93"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0094",
+      "version": "1.0.94",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0094@1.0.94",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0094@1.0.94"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0095",
+      "version": "1.0.95",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0095@1.0.95",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0095@1.0.95"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0096",
+      "version": "1.0.96",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0096@1.0.96",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0096@1.0.96"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0097",
+      "version": "1.0.97",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0097@1.0.97",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0097@1.0.97"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0098",
+      "version": "1.0.98",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0098@1.0.98",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0098@1.0.98"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0099",
+      "version": "1.0.99",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0099@1.0.99",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0099@1.0.99"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0100",
+      "version": "1.0.100",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0100@1.0.100",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0100@1.0.100"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0101",
+      "version": "1.0.101",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0101@1.0.101",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0101@1.0.101"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0102",
+      "version": "1.0.102",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0102@1.0.102",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0102@1.0.102"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0103",
+      "version": "1.0.103",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0103@1.0.103",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0103@1.0.103"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0104",
+      "version": "1.0.104",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0104@1.0.104",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0104@1.0.104"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0105",
+      "version": "1.0.105",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0105@1.0.105",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0105@1.0.105"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0106",
+      "version": "1.0.106",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0106@1.0.106",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0106@1.0.106"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0107",
+      "version": "1.0.107",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0107@1.0.107",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0107@1.0.107"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0108",
+      "version": "1.0.108",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0108@1.0.108",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0108@1.0.108"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0109",
+      "version": "1.0.109",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0109@1.0.109",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0109@1.0.109"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0110",
+      "version": "1.0.110",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0110@1.0.110",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0110@1.0.110"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0111",
+      "version": "1.0.111",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0111@1.0.111",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0111@1.0.111"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0112",
+      "version": "1.0.112",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0112@1.0.112",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0112@1.0.112"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0113",
+      "version": "1.0.113",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0113@1.0.113",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0113@1.0.113"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0114",
+      "version": "1.0.114",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0114@1.0.114",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0114@1.0.114"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0115",
+      "version": "1.0.115",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0115@1.0.115",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0115@1.0.115"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0116",
+      "version": "1.0.116",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0116@1.0.116",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0116@1.0.116"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0117",
+      "version": "1.0.117",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0117@1.0.117",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0117@1.0.117"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0118",
+      "version": "1.0.118",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0118@1.0.118",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0118@1.0.118"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0119",
+      "version": "1.0.119",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0119@1.0.119",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0119@1.0.119"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0120",
+      "version": "1.0.120",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0120@1.0.120",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0120@1.0.120"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0121",
+      "version": "1.0.121",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0121@1.0.121",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0121@1.0.121"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0122",
+      "version": "1.0.122",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0122@1.0.122",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0122@1.0.122"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0123",
+      "version": "1.0.123",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0123@1.0.123",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0123@1.0.123"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0124",
+      "version": "1.0.124",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0124@1.0.124",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0124@1.0.124"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0125",
+      "version": "1.0.125",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0125@1.0.125",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0125@1.0.125"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0126",
+      "version": "1.0.126",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0126@1.0.126",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0126@1.0.126"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0127",
+      "version": "1.0.127",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0127@1.0.127",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0127@1.0.127"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0128",
+      "version": "1.0.128",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0128@1.0.128",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0128@1.0.128"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0129",
+      "version": "1.0.129",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0129@1.0.129",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0129@1.0.129"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0130",
+      "version": "1.0.130",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0130@1.0.130",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0130@1.0.130"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0131",
+      "version": "1.0.131",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0131@1.0.131",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0131@1.0.131"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0132",
+      "version": "1.0.132",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0132@1.0.132",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0132@1.0.132"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0133",
+      "version": "1.0.133",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0133@1.0.133",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0133@1.0.133"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0134",
+      "version": "1.0.134",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0134@1.0.134",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0134@1.0.134"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0135",
+      "version": "1.0.135",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0135@1.0.135",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0135@1.0.135"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0136",
+      "version": "1.0.136",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0136@1.0.136",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0136@1.0.136"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0137",
+      "version": "1.0.137",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0137@1.0.137",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0137@1.0.137"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0138",
+      "version": "1.0.138",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0138@1.0.138",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0138@1.0.138"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0139",
+      "version": "1.0.139",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0139@1.0.139",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0139@1.0.139"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0140",
+      "version": "1.0.140",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0140@1.0.140",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0140@1.0.140"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0141",
+      "version": "1.0.141",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0141@1.0.141",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0141@1.0.141"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0142",
+      "version": "1.0.142",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0142@1.0.142",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0142@1.0.142"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0143",
+      "version": "1.0.143",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0143@1.0.143",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0143@1.0.143"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0144",
+      "version": "1.0.144",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0144@1.0.144",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0144@1.0.144"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0145",
+      "version": "1.0.145",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0145@1.0.145",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0145@1.0.145"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0146",
+      "version": "1.0.146",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0146@1.0.146",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0146@1.0.146"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0147",
+      "version": "1.0.147",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0147@1.0.147",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0147@1.0.147"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0148",
+      "version": "1.0.148",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0148@1.0.148",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0148@1.0.148"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0149",
+      "version": "1.0.149",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0149@1.0.149",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0149@1.0.149"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0150",
+      "version": "1.0.150",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0150@1.0.150",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0150@1.0.150"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0151",
+      "version": "1.0.151",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0151@1.0.151",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0151@1.0.151"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0152",
+      "version": "1.0.152",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0152@1.0.152",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0152@1.0.152"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0153",
+      "version": "1.0.153",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0153@1.0.153",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0153@1.0.153"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0154",
+      "version": "1.0.154",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0154@1.0.154",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0154@1.0.154"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0155",
+      "version": "1.0.155",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0155@1.0.155",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0155@1.0.155"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0156",
+      "version": "1.0.156",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0156@1.0.156",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0156@1.0.156"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0157",
+      "version": "1.0.157",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0157@1.0.157",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0157@1.0.157"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0158",
+      "version": "1.0.158",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0158@1.0.158",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0158@1.0.158"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0159",
+      "version": "1.0.159",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0159@1.0.159",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0159@1.0.159"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0160",
+      "version": "1.0.160",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0160@1.0.160",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0160@1.0.160"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0161",
+      "version": "1.0.161",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0161@1.0.161",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0161@1.0.161"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0162",
+      "version": "1.0.162",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0162@1.0.162",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0162@1.0.162"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0163",
+      "version": "1.0.163",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0163@1.0.163",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0163@1.0.163"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0164",
+      "version": "1.0.164",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0164@1.0.164",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0164@1.0.164"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0165",
+      "version": "1.0.165",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0165@1.0.165",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0165@1.0.165"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0166",
+      "version": "1.0.166",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0166@1.0.166",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0166@1.0.166"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0167",
+      "version": "1.0.167",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0167@1.0.167",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0167@1.0.167"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0168",
+      "version": "1.0.168",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0168@1.0.168",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0168@1.0.168"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0169",
+      "version": "1.0.169",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0169@1.0.169",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0169@1.0.169"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0170",
+      "version": "1.0.170",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0170@1.0.170",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0170@1.0.170"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0171",
+      "version": "1.0.171",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0171@1.0.171",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0171@1.0.171"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0172",
+      "version": "1.0.172",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0172@1.0.172",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0172@1.0.172"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0173",
+      "version": "1.0.173",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0173@1.0.173",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0173@1.0.173"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0174",
+      "version": "1.0.174",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0174@1.0.174",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0174@1.0.174"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0175",
+      "version": "1.0.175",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0175@1.0.175",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0175@1.0.175"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0176",
+      "version": "1.0.176",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0176@1.0.176",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0176@1.0.176"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0177",
+      "version": "1.0.177",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0177@1.0.177",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0177@1.0.177"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0178",
+      "version": "1.0.178",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0178@1.0.178",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0178@1.0.178"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0179",
+      "version": "1.0.179",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0179@1.0.179",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0179@1.0.179"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0180",
+      "version": "1.0.180",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0180@1.0.180",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0180@1.0.180"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0181",
+      "version": "1.0.181",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0181@1.0.181",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0181@1.0.181"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0182",
+      "version": "1.0.182",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0182@1.0.182",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0182@1.0.182"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0183",
+      "version": "1.0.183",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0183@1.0.183",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0183@1.0.183"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0184",
+      "version": "1.0.184",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0184@1.0.184",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0184@1.0.184"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0185",
+      "version": "1.0.185",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0185@1.0.185",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0185@1.0.185"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0186",
+      "version": "1.0.186",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0186@1.0.186",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0186@1.0.186"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0187",
+      "version": "1.0.187",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0187@1.0.187",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0187@1.0.187"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0188",
+      "version": "1.0.188",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0188@1.0.188",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0188@1.0.188"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0189",
+      "version": "1.0.189",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0189@1.0.189",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0189@1.0.189"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0190",
+      "version": "1.0.190",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0190@1.0.190",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0190@1.0.190"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0191",
+      "version": "1.0.191",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0191@1.0.191",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0191@1.0.191"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0192",
+      "version": "1.0.192",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0192@1.0.192",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0192@1.0.192"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0193",
+      "version": "1.0.193",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0193@1.0.193",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0193@1.0.193"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0194",
+      "version": "1.0.194",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0194@1.0.194",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0194@1.0.194"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0195",
+      "version": "1.0.195",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0195@1.0.195",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0195@1.0.195"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0196",
+      "version": "1.0.196",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0196@1.0.196",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0196@1.0.196"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0197",
+      "version": "1.0.197",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0197@1.0.197",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0197@1.0.197"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0198",
+      "version": "1.0.198",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0198@1.0.198",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0198@1.0.198"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0199",
+      "version": "1.0.199",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0199@1.0.199",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0199@1.0.199"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0200",
+      "version": "1.0.200",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0200@1.0.200",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0200@1.0.200"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0201",
+      "version": "1.0.201",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0201@1.0.201",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0201@1.0.201"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0202",
+      "version": "1.0.202",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0202@1.0.202",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0202@1.0.202"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0203",
+      "version": "1.0.203",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0203@1.0.203",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0203@1.0.203"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0204",
+      "version": "1.0.204",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0204@1.0.204",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0204@1.0.204"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0205",
+      "version": "1.0.205",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0205@1.0.205",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0205@1.0.205"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0206",
+      "version": "1.0.206",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0206@1.0.206",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0206@1.0.206"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0207",
+      "version": "1.0.207",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0207@1.0.207",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0207@1.0.207"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0208",
+      "version": "1.0.208",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0208@1.0.208",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0208@1.0.208"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0209",
+      "version": "1.0.209",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0209@1.0.209",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0209@1.0.209"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0210",
+      "version": "1.0.210",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0210@1.0.210",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0210@1.0.210"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0211",
+      "version": "1.0.211",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0211@1.0.211",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0211@1.0.211"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0212",
+      "version": "1.0.212",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0212@1.0.212",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0212@1.0.212"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0213",
+      "version": "1.0.213",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0213@1.0.213",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0213@1.0.213"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0214",
+      "version": "1.0.214",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0214@1.0.214",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0214@1.0.214"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0215",
+      "version": "1.0.215",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0215@1.0.215",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0215@1.0.215"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0216",
+      "version": "1.0.216",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0216@1.0.216",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0216@1.0.216"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0217",
+      "version": "1.0.217",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0217@1.0.217",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0217@1.0.217"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0218",
+      "version": "1.0.218",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0218@1.0.218",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0218@1.0.218"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0219",
+      "version": "1.0.219",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0219@1.0.219",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0219@1.0.219"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0220",
+      "version": "1.0.220",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0220@1.0.220",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0220@1.0.220"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0221",
+      "version": "1.0.221",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0221@1.0.221",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0221@1.0.221"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0222",
+      "version": "1.0.222",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0222@1.0.222",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0222@1.0.222"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0223",
+      "version": "1.0.223",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0223@1.0.223",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0223@1.0.223"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0224",
+      "version": "1.0.224",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0224@1.0.224",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0224@1.0.224"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0225",
+      "version": "1.0.225",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0225@1.0.225",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0225@1.0.225"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0226",
+      "version": "1.0.226",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0226@1.0.226",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0226@1.0.226"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0227",
+      "version": "1.0.227",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0227@1.0.227",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0227@1.0.227"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0228",
+      "version": "1.0.228",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0228@1.0.228",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0228@1.0.228"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0229",
+      "version": "1.0.229",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0229@1.0.229",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0229@1.0.229"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0230",
+      "version": "1.0.230",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0230@1.0.230",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0230@1.0.230"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0231",
+      "version": "1.0.231",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0231@1.0.231",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0231@1.0.231"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0232",
+      "version": "1.0.232",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0232@1.0.232",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0232@1.0.232"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0233",
+      "version": "1.0.233",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0233@1.0.233",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0233@1.0.233"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0234",
+      "version": "1.0.234",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0234@1.0.234",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0234@1.0.234"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0235",
+      "version": "1.0.235",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0235@1.0.235",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0235@1.0.235"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0236",
+      "version": "1.0.236",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0236@1.0.236",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0236@1.0.236"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0237",
+      "version": "1.0.237",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0237@1.0.237",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0237@1.0.237"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0238",
+      "version": "1.0.238",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0238@1.0.238",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0238@1.0.238"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0239",
+      "version": "1.0.239",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0239@1.0.239",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0239@1.0.239"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0240",
+      "version": "1.0.240",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0240@1.0.240",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0240@1.0.240"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0241",
+      "version": "1.0.241",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0241@1.0.241",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0241@1.0.241"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0242",
+      "version": "1.0.242",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0242@1.0.242",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0242@1.0.242"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0243",
+      "version": "1.0.243",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0243@1.0.243",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0243@1.0.243"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0244",
+      "version": "1.0.244",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0244@1.0.244",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0244@1.0.244"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0245",
+      "version": "1.0.245",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0245@1.0.245",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0245@1.0.245"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0246",
+      "version": "1.0.246",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0246@1.0.246",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0246@1.0.246"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0247",
+      "version": "1.0.247",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0247@1.0.247",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0247@1.0.247"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0248",
+      "version": "1.0.248",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0248@1.0.248",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0248@1.0.248"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0249",
+      "version": "1.0.249",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0249@1.0.249",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0249@1.0.249"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0250",
+      "version": "1.0.250",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0250@1.0.250",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0250@1.0.250"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0251",
+      "version": "1.0.251",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0251@1.0.251",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0251@1.0.251"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0252",
+      "version": "1.0.252",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0252@1.0.252",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0252@1.0.252"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0253",
+      "version": "1.0.253",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0253@1.0.253",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0253@1.0.253"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0254",
+      "version": "1.0.254",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0254@1.0.254",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0254@1.0.254"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0255",
+      "version": "1.0.255",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0255@1.0.255",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0255@1.0.255"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0256",
+      "version": "1.0.256",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0256@1.0.256",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0256@1.0.256"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0257",
+      "version": "1.0.257",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0257@1.0.257",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0257@1.0.257"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0258",
+      "version": "1.0.258",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0258@1.0.258",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0258@1.0.258"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0259",
+      "version": "1.0.259",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0259@1.0.259",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0259@1.0.259"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0260",
+      "version": "1.0.260",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0260@1.0.260",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0260@1.0.260"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0261",
+      "version": "1.0.261",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0261@1.0.261",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0261@1.0.261"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0262",
+      "version": "1.0.262",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0262@1.0.262",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0262@1.0.262"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0263",
+      "version": "1.0.263",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0263@1.0.263",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0263@1.0.263"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0264",
+      "version": "1.0.264",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0264@1.0.264",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0264@1.0.264"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0265",
+      "version": "1.0.265",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0265@1.0.265",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0265@1.0.265"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0266",
+      "version": "1.0.266",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0266@1.0.266",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0266@1.0.266"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0267",
+      "version": "1.0.267",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0267@1.0.267",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0267@1.0.267"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0268",
+      "version": "1.0.268",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0268@1.0.268",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0268@1.0.268"
+    },
+    {
+      "type": "library",
+      "name": "zzz-obscure-nonexistent-pkg-0269",
+      "version": "1.0.269",
+      "purl": "pkg:npm/zzz-obscure-nonexistent-pkg-0269@1.0.269",
+      "bom-ref": "pkg:npm/zzz-obscure-nonexistent-pkg-0269@1.0.269"
+    }
+  ]
+}

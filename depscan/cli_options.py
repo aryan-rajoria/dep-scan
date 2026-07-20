@@ -129,7 +129,7 @@ def build_parser():
         action="store_true",
         default=os.getenv("ENABLE_OSS_RISK", "") in ("true", "1"),
         dest="risk_audit",
-        help="Perform package risk audit (slow operation). Npm only.",
+        help="Perform package risk audit (slow operation). Supported for npm, pypi, and cargo.",
     )
     parser.add_argument(
         "--cdxgen-args",

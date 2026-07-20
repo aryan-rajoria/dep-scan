@@ -1,14 +1,87 @@
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
+from vdb.lib import db6 as _vdb_db6
 from vdb.lib.search import (
+    get_cve_data_batched,
     search_by_any,
     search_by_cpe_like,
     search_by_url,
     search_by_purl_like,
+    search_packages_batched,
 )
 
 from analysis_lib.normalize import create_pkg_variations, dealias_packages, dedup
+
+
+# Ecosystems whose namespace/name vdb stores in lowercase. Maven is deliberately
+# excluded (artifact IDs are case-sensitive). Golang is excluded (Go module
+# paths are case-sensitive). OS types are excluded because distro qualifiers and
+# namespace aliases are handled by vdb's canonicalize_os_purl_prefix at lookup
+# time.
+_CASE_INSENSITIVE_PURL_TYPES = frozenset(
+    {
+        "npm",
+        "pypi",
+        "composer",
+        "hex",
+        "elixir",
+        "cargo",
+        "crates",
+        "nuget",
+        "gem",
+        "rubygems",
+        "pub",
+        "dart",
+        "github",
+        "bitbucket",
+        "gitlab",
+    }
+)
+
+
+def canonicalize_search_purl(purl: str) -> str:
+    """Canonicalise a purl for vdb search.
+
+    For ecosystems whose namespace/name vdb stores in lowercase (npm, pypi,
+    cargo, github, …), the ``pkg:type/namespace/name`` prefix is lowercased so a
+    mixed-case SBOM purl still matches. Maven and Golang are preserved
+    (case-sensitive). OS/container purls are left untouched so distro qualifiers
+    (distro_name, distro, arch) and namespace aliases survive intact. Version,
+    qualifiers, and subpath are always preserved verbatim.
+
+    This is a hot path (called per component), so it deliberately avoids a full
+    ``PackageURL`` parse+rebuild round-trip. It works on the raw string and
+    short-circuits when the purl is already lowercase (the common case). Note
+    that vdb's ``search_by_purl_like`` also lowercases the purl_prefix at lookup
+    time; this function keeps depscan's ``matched_by`` and any custom-data keys
+    consistent with that folding without paying the parse cost.
+    """
+    if not purl or not purl.startswith("pkg:"):
+        return purl
+    # Fast path: nothing to fold.
+    if purl == purl.lower():
+        return purl
+    ptype = purl[4:].split("/", 1)[0].lower()
+    if ptype not in _CASE_INSENSITIVE_PURL_TYPES:
+        return purl
+    # Cut off qualifiers (?) and subpath (#), which must be preserved verbatim.
+    end = len(purl)
+    for sep in ("?", "#"):
+        idx = purl.find(sep)
+        if idx != -1 and idx < end:
+            end = idx
+    prefix, tail = purl[:end], purl[end:]
+    # The version separator '@' is the one after the final '/', so a scoped-npm
+    # namespace written with a literal '@' (pkg:npm/@Scope/Name) is not mistaken
+    # for a version. Version, qualifiers and subpath are preserved as-is.
+    last_slash = prefix.rfind("/")
+    at_pos = prefix.find("@", last_slash + 1)
+    name_end = at_pos if at_pos != -1 else len(prefix)
+    # Lowercase the type/namespace/name and encode a literal npm scope '@' as
+    # %40 (purl spec), so "@Scope" and "%40Scope" converge on the same form.
+    folded = prefix[:name_end].lower().replace("/@", "/%40")
+    return folded + prefix[name_end:] + tail
 
 
 def get_pkg_vendor_name(pkg: Dict) -> Tuple[str, str]:
@@ -114,13 +187,118 @@ def find_vulns(
             purl_aliases |= tmp_purl_aliases
     else:
         expanded_list = pkg_list
-    raw_results = []
-    for pkg in expanded_list:
-        if res := search_expanded(pkg, fuzzy_search, search_order):
-            raw_results.extend(res)
+    # The batched path pushes the per-package search loop down into vdb's
+    # search_packages_batched, doing a lightweight with_data=False first pass
+    # and hydrating only matched components. It is the default for the default
+    # search order; fuzzy search and a custom search_order fall back to the
+    # serial path (which preserves their variation/ordering semantics).
+    if not fuzzy_search and not search_order:
+        raw_results = find_vulns_batched(expanded_list)
+    else:
+        raw_results = []
+        for pkg in expanded_list:
+            if res := search_expanded(pkg, fuzzy_search, search_order):
+                raw_results.extend(res)
     raw_results = dedup(project_type, raw_results)
     pkg_aliases = dealias_packages(raw_results, pkg_aliases=pkg_aliases, purl_aliases=purl_aliases)
     return raw_results, pkg_aliases, purl_aliases
+
+
+def _pkg_to_locator(pkg: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str]:
+    """Convert a package dict to a vdb search locator.
+
+    Mirrors the term-priority used by search_expanded: purl, then cpe, then url.
+    Purls are canonicalised for search (T4). Returns ``(locator, original_purl)``
+    so the caller can restore matched_by to the SBOM purl after hydration.
+    """
+    purl = pkg.get("purl") or ""
+    if purl:
+        return {"purl": canonicalize_search_purl(purl)}, purl
+    cpe = pkg.get("cpe")
+    if cpe:
+        return {"cpe": cpe}, ""
+    url = pkg.get("url")
+    if url:
+        return {"url": url}, ""
+    return None, ""
+
+
+def find_vulns_batched(expanded_list: List[Dict[str, Any]]) -> List:
+    """Batched vulnerability search using vdb's search_packages_batched.
+
+    Two-pass strategy:
+      1. Lightweight pass (with_data=False) — index-only, no pydantic
+         hydration, to identify which components have any matches.
+      2. Hydration pass — full CVE source data for matched components only.
+
+    When no custom-data overlay is loaded (the common case), pass 2 hydrates
+    the index hits captured in pass 1 directly via ``get_cve_data_batched``,
+    avoiding a redundant index query. When custom data is present, each matched
+    purl is re-searched with ``with_data=True`` so DB + overlay results are
+    merged correctly.
+
+    The versionless-purl skip (#465) is preserved: components that carry a
+    purl but no version are not searched.
+    """
+    from vdb.lib.search import CUSTOM_DATA_CACHE
+
+    locators: List[Dict[str, Any]] = []
+    # Map canonical search term -> original SBOM purl for matched_by restoration
+    term_to_original: Dict[str, str] = {}
+    for pkg in expanded_list:
+        # Versionless-purl skip (non-fuzzy only — fuzzy mode uses the serial
+        # path). See Discussion #465.
+        if pkg.get("purl") and not pkg.get("version"):
+            continue
+        loc, original_purl = _pkg_to_locator(pkg)
+        if loc:
+            locators.append(loc)
+            if original_purl:
+                key = loc.get("purl") or loc.get("cpe") or ""
+                if key:
+                    term_to_original[key] = original_purl
+    if not locators:
+        return []
+
+    # Pass 1: identify matched locators without paying hydration cost
+    hits_by_term: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    matched_terms: List[str] = []
+    for batch in search_packages_batched(locators, batch_size=50, with_data=False):
+        for summary in batch:
+            if summary.get("result_count", 0) > 0:
+                term = summary["locator"].get("purl") or summary["locator"].get("cpe") or ""
+                if term:
+                    hits_by_term[term] = summary.get("results", [])
+                    matched_terms.append(term)
+    if not matched_terms:
+        return []
+
+    has_custom = bool(CUSTOM_DATA_CACHE)
+    db_conn, _ = _vdb_db6.get(read_only=True)
+    raw_results: List = []
+    for term in matched_terms:
+        hits = hits_by_term[term]
+        original = term_to_original.get(term, term)
+        if has_custom:
+            # Custom overlay may add or override results; re-search this term
+            # with full data so DB + custom are merged by search_by_purl_like.
+            results = list(search_by_purl_like(term, with_data=True))
+        else:
+            # Direct hydration of the index hits from pass 1 — avoids
+            # re-querying the cve_index for matched components.
+            results = list(get_cve_data_batched(db_conn, hits, term))
+        _restore_matched_by(results, term, original)
+        raw_results.extend(results)
+    return raw_results
+
+
+def _restore_matched_by(results, canonical_term, original_term):
+    """Restore the original-case purl as matched_by after a canonicalized search."""
+    if not results or canonical_term == original_term:
+        return
+    for r in results:
+        if r.get("matched_by") == canonical_term:
+            r["matched_by"] = original_term
 
 
 def search_expanded(pkg: Dict, fuzzy_search, search_order) -> List:
@@ -128,11 +306,19 @@ def search_expanded(pkg: Dict, fuzzy_search, search_order) -> List:
     raw_results = []
     # Default search order is purl or cpe or url (pcu)
     search_term = pkg.get("purl") or pkg.get("cpe") or pkg.get("url")
+    original_purl = pkg.get("purl") or ""
+    # Canonicalise the purl for search (lowercase for case-insensitive types)
+    # so mixed-case SBOM purls still match vdb entries. matched_by is restored
+    # to the original purl afterwards to keep downstream linking intact.
+    if search_term and isinstance(search_term, str) and search_term.startswith("pkg:"):
+        search_term = canonicalize_search_purl(search_term)
     # Make the search logic and order configurable
     search_logic = search_by_any
     if search_order == "purl":
         search_logic = search_by_purl_like
         search_term = pkg.get("purl")
+        if search_term:
+            search_term = canonicalize_search_purl(search_term)
     elif search_order == "cpe":
         search_logic = search_by_cpe_like
         search_term = pkg.get("cpe")
@@ -142,11 +328,14 @@ def search_expanded(pkg: Dict, fuzzy_search, search_order) -> List:
     elif search_order == "cpu":
         search_logic = search_by_any
         search_term = pkg.get("cpe") or pkg.get("purl") or pkg.get("url")
+        if search_term and isinstance(search_term, str) and search_term.startswith("pkg:"):
+            search_term = canonicalize_search_purl(search_term)
     # Discussion #465. When there are versionless purls, filter them in non-fuzzy mode
     if not fuzzy_search and search_term and pkg.get("purl") and not pkg.get("version"):
         return raw_results
     # Give preference to our search logic
     if search_term and (res := search_logic(search_term, with_data=True)):
+        _restore_matched_by(res, search_term, original_purl)
         raw_results.extend(res)
     elif fuzzy_search:
         # Perform fuzzy search if requested retaining the search logic

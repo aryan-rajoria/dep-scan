@@ -1,15 +1,10 @@
 import math
 
+import httpx
+
 from depscan.lib import config
 
-try:
-    from hishel.httpx import SyncCacheClient
-
-    httpclient = SyncCacheClient()
-except ImportError:
-    import httpx
-
-    httpclient = httpx
+httpclient = httpx
 
 
 def get_lookup_url(registry_type, pkg):

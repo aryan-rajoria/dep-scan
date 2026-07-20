@@ -1,6 +1,11 @@
 import os
 
-from depscan.lib.bom import get_pkg_by_type, get_pkg_list, parse_bom_ref
+from depscan.lib.bom import (
+    get_pkg_by_type,
+    get_pkg_list,
+    parse_bom_ref,
+    update_tools_metadata,
+)
 
 
 def test_get_pkg():
@@ -124,3 +129,65 @@ def test_get_pkg_by_type():
     assert len(pkg_list) == 1824
     filtered_list = get_pkg_by_type(pkg_list, "npm")
     assert len(filtered_list) == 1823
+
+
+# ---------------------------------------------------------------------------
+# T5 — CycloneDX 1.7 parse/emit readiness
+# ---------------------------------------------------------------------------
+
+
+def test_get_pkg_list_parses_cyclonedx_1_7_xml():
+    """A CycloneDX 1.7 XML BOM (cdxgen 12.8 default) must parse cleanly,
+    including the licenses section under the 1.7 namespace."""
+    test_bom = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "data", "bom-1.7.xml"
+    )
+    pkg_list = get_pkg_list(test_bom)
+    assert pkg_list is not None
+    assert len(pkg_list) == 2
+    by_name = {p["name"]: p for p in pkg_list}
+    assert "lodash" in by_name
+    assert by_name["lodash"]["version"] == "4.17.21"
+    # Licenses must be extracted from the 1.7 namespace
+    assert "MIT" in by_name["lodash"]["licenses"]
+    assert "BSD-3-Clause" in by_name["django"]["licenses"]
+
+
+def test_update_tools_metadata_preserves_existing_spec_version():
+    """When a source BOM has specVersion 1.7, update_tools_metadata must not
+    downgrade it to 1.6."""
+    bom_data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": {"tools": {}},
+    }
+    result = update_tools_metadata({}, bom_data, "1.0.0")
+    assert result["specVersion"] == "1.7"
+
+
+def test_update_tools_metadata_defaults_for_new_bom():
+    """A from-scratch VDR (no source BOM) gets a valid specVersion."""
+    result = update_tools_metadata(None, None, "1.0.0")
+    assert result["specVersion"]  # some valid version
+    assert result["bomFormat"] == "CycloneDX"
+
+
+def test_export_bom_preserves_source_spec_version(tmp_path):
+    """VDR specVersion must be ≥ source specVersion (never downgraded)."""
+    from depscan.lib.bom import export_bom
+
+    bom_data = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.7",
+        "version": 1,
+        "metadata": {"tools": {"components": []}},
+        "components": [],
+    }
+    vdr_file = str(tmp_path / "test.vdr.json")
+    export_bom(bom_data, "1.0.0", [], vdr_file)
+    import json
+
+    with open(vdr_file) as f:
+        vdr = json.load(f)
+    assert vdr["specVersion"] == "1.7"
