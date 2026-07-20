@@ -4,6 +4,7 @@
 import contextlib
 import os
 import sys
+import time
 from typing import List
 
 from analysis_lib import ReachabilityAnalysisKV, VdrAnalysisKV, get_all_bom_files
@@ -65,6 +66,55 @@ try:
     ORAS_AVAILABLE = True
 except ImportError:
     pass
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    """Read a positive int from the environment, falling back to ``default``."""
+    try:
+        value = int(os.getenv(name, ""))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+# The vdb image is a multi-GB oras pull; a dropped connection mid-stream raises
+# ChunkedEncodingError / urllib3 ProtocolError / IncompleteRead. These are
+# transient (common in CI), so retry a few times before giving up.
+VDB_DOWNLOAD_MAX_ATTEMPTS = _positive_int_env("VDB_DOWNLOAD_RETRIES", 3)
+VDB_DOWNLOAD_RETRY_BACKOFF_SEC = _positive_int_env("VDB_DOWNLOAD_RETRY_BACKOFF_SEC", 5)
+
+
+def download_vdb_with_retries(
+    vdb_database_url, data_dir, attempts=VDB_DOWNLOAD_MAX_ATTEMPTS
+):
+    """Download the vulnerability database, retrying transient network errors.
+
+    ``download_image`` streams large blobs and can fail partway through with a
+    variety of exceptions raised across the requests/urllib3/oras layers. We
+    retry with a linear backoff and re-raise the last error if every attempt
+    fails so the caller's existing error handling still applies.
+    """
+    last_exc = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return download_image(vdb_database_url, data_dir)
+        except Exception as e:  # noqa: BLE001 - transient failures vary by layer
+            last_exc = e
+            if attempt < attempts:
+                LOG.warning(
+                    "Vulnerability database download failed (attempt %d/%d): %s. Retrying ...",
+                    attempt,
+                    attempts,
+                    e,
+                )
+                time.sleep(VDB_DOWNLOAD_RETRY_BACKOFF_SEC * attempt)
+            else:
+                LOG.error(
+                    "Vulnerability database download failed after %d attempt(s).",
+                    attempts,
+                )
+    if last_exc is not None:
+        raise last_exc
 
 
 def build_args():
@@ -363,9 +413,10 @@ def run_depscan(args):
             ) as vdb_download_status:
                 if not IS_CI:
                     vdb_download_status.stop()
-                # This line may exit with an exception if the database cannot be downloaded.
+                # This line may exit with an exception if the database cannot be
+                # downloaded even after retries.
                 # Example: urllib3.exceptions.IncompleteRead, urllib3.exceptions.ProtocolError, requests.exceptions.ChunkedEncodingError
-                download_image(vdb_database_url, config.DATA_DIR)
+                download_vdb_with_retries(vdb_database_url, config.DATA_DIR)
         else:
             LOG.warning(
                 "The latest vulnerability database is not found. Follow the documentation to manually download it."

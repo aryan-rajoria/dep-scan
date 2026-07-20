@@ -367,6 +367,36 @@ def test_framework_reachability_ignores_tags(tmp_path):
     assert res.reached_services is None or res.reached_services == {}
 
 
+# --- _track_usage_targets shape tolerance (AppThreat/atom#221) --------
+
+
+def test_track_usage_targets_list_lines():
+    """The classic shape: per-file value is a list of line numbers."""
+    usage_targets = {}
+    SemanticReachability._track_usage_targets(
+        usage_targets, {"GET /x": {"Foo.java": [10, 20]}}
+    )
+    assert usage_targets == {"Foo.java": True, "Foo.java#10": True, "Foo.java#20": True}
+
+
+def test_track_usage_targets_int_line_does_not_crash():
+    """Newer atom slices may emit a bare int for the lines value. This must
+    not raise ``TypeError: 'int' object is not iterable`` (dep-scan#459)."""
+    usage_targets = {}
+    SemanticReachability._track_usage_targets(
+        usage_targets, {"GET /x": {"Foo.java": 42}}
+    )
+    assert usage_targets == {"Foo.java": True, "Foo.java#42": True}
+
+
+def test_track_usage_targets_ignores_non_dict_values():
+    """Garbage shapes are skipped rather than crashing."""
+    usage_targets = {}
+    SemanticReachability._track_usage_targets(usage_targets, {"GET /x": ["not", "a", "dict"]})
+    SemanticReachability._track_usage_targets(usage_targets, "not a dict")
+    assert usage_targets == {}
+
+
 # --- R3b: cross-file dedup --------------------------------------------
 
 

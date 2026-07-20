@@ -136,10 +136,14 @@ def _track_usage_targets(usage_targets, usages_object):
         if not isinstance(v, dict):
             continue
         for file, lines in v.items():
-            if not isinstance(lines, list):
-                continue
-            for aline in lines:
-                usage_targets.add(f"{file}#{aline}")
+            # x-atom-usages values are usually a list of line numbers, but the
+            # "target" sub-key has historically been a bare int (a single line).
+            # Handle both so those target lines are not silently dropped.
+            if isinstance(lines, (list, tuple, set)):
+                for aline in lines:
+                    usage_targets.add(f"{file}#{aline}")
+            elif isinstance(lines, int):
+                usage_targets.add(f"{file}#{lines}")
 
 
 def print_endpoints(ospec, header_section=None):

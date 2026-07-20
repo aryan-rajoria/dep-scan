@@ -310,11 +310,22 @@ class SemanticReachability(FrameworkReachability):
 
     @staticmethod
     def _track_usage_targets(usage_targets, usages_object):
+        # x-atom-usages shape varies across atom versions: the per-file value
+        # is usually a list of line numbers, but newer slices may emit a bare
+        # int (a single line) — guard both so a format change never crashes the
+        # analyzer. See AppThreat/atom#221 and dep-scan#459.
+        if not isinstance(usages_object, dict):
+            return
         for k, v in usages_object.items():
+            if not isinstance(v, dict):
+                continue
             for file, lines in v.items():
                 usage_targets[file] = True
-                for aline in lines:
-                    usage_targets[f"{file}#{aline}"] = True
+                if isinstance(lines, (list, tuple, set)):
+                    for aline in lines:
+                        usage_targets[f"{file}#{aline}"] = True
+                elif isinstance(lines, int):
+                    usage_targets[f"{file}#{lines}"] = True
 
     @staticmethod
     def _track_binary_reachability(
@@ -364,8 +375,15 @@ class SemanticReachability(FrameworkReachability):
         usage_targets = {}
         if analysis_options.openapi_spec_files:
             for ospec in analysis_options.openapi_spec_files:
-                paths = json_load(ospec).get("paths") or {}
+                spec_data = json_load(ospec)
+                if not isinstance(spec_data, dict):
+                    continue
+                paths = spec_data.get("paths") or {}
+                if not isinstance(paths, dict):
+                    continue
                 for url_prefix, path_obj in paths.items():
+                    if not isinstance(path_obj, dict):
+                        continue
                     for k, v in path_obj.items():
                         # Java, JavaScript, Python etc
                         if k == "x-atom-usages":
