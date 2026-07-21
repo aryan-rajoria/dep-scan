@@ -4,6 +4,7 @@
 import contextlib
 import os
 import sys
+import time
 from typing import List
 
 from analysis_lib import ReachabilityAnalysisKV, VdrAnalysisKV, get_all_bom_files
@@ -25,7 +26,7 @@ from vdb.lib.utils import parse_purl
 from depscan import get_version
 from depscan.cli_options import build_parser
 from depscan.lib import explainer, utils
-from depscan.lib.audit import audit, risk_audit, risk_audit_map, type_audit_map
+from depscan.lib.audit import risk_audit, risk_audit_map
 from depscan.lib.bom import annotate_vdr, create_bom, create_empty_vdr, export_bom, get_pkg_by_type
 from depscan.lib.config import (
     DEPSCAN_DEFAULT_VDR_FILE,
@@ -67,12 +68,81 @@ except ImportError:
     pass
 
 
+def _positive_int_env(name: str, default: int) -> int:
+    """Read a positive int from the environment, falling back to ``default``."""
+    try:
+        value = int(os.getenv(name, ""))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+# The vdb image is a multi-GB oras pull; a dropped connection mid-stream raises
+# ChunkedEncodingError / urllib3 ProtocolError / IncompleteRead. These are
+# transient (common in CI), so retry a few times before giving up.
+VDB_DOWNLOAD_MAX_ATTEMPTS = _positive_int_env("VDB_DOWNLOAD_RETRIES", 3)
+VDB_DOWNLOAD_RETRY_BACKOFF_SEC = _positive_int_env("VDB_DOWNLOAD_RETRY_BACKOFF_SEC", 5)
+
+
+def download_vdb_with_retries(
+    vdb_database_url, data_dir, attempts=VDB_DOWNLOAD_MAX_ATTEMPTS
+):
+    """Download the vulnerability database, retrying transient network errors.
+
+    ``download_image`` streams large blobs and can fail partway through with a
+    variety of exceptions raised across the requests/urllib3/oras layers. We
+    retry with a linear backoff and re-raise the last error if every attempt
+    fails so the caller's existing error handling still applies.
+    """
+    last_exc = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return download_image(vdb_database_url, data_dir)
+        except Exception as e:  # noqa: BLE001 - transient failures vary by layer
+            last_exc = e
+            if attempt < attempts:
+                LOG.warning(
+                    "Vulnerability database download failed (attempt %d/%d): %s. Retrying ...",
+                    attempt,
+                    attempts,
+                    e,
+                )
+                time.sleep(VDB_DOWNLOAD_RETRY_BACKOFF_SEC * attempt)
+            else:
+                LOG.error(
+                    "Vulnerability database download failed after %d attempt(s).",
+                    attempts,
+                )
+    if last_exc is not None:
+        raise last_exc
+
+
 def build_args():
     """
     Constructs command line arguments for the depscan tool
     """
     parser = build_parser()
     return parser.parse_args()
+
+
+def configure_vdb_readonly():
+    """Default vdb SQLite to read-only/immutable + WAL for scan runs.
+
+    These defaults let SQLite skip lock acquisition and journal overhead on
+    the read-only scan path, which is a prerequisite for safe concurrent
+    reads and a small speed win. They are applied AFTER the vdb download so
+    the update path is never opened immutable.
+
+    Override with ``VDB_SQLITE_IMMUTABLE=false`` or
+    ``VDB_SQLITE_JOURNAL_MODE=DELETE``.
+    """
+    if os.getenv("VDB_SQLITE_IMMUTABLE", "").lower() not in ("false", "0"):
+        os.environ["VDB_SQLITE_IMMUTABLE"] = "true"
+        # config.VDB_SQLITE_IMMUTABLE was captured at import time; patch it so
+        # db6._sqlite_uri picks up immutable=1 on the first connection.
+        config.VDB_SQLITE_IMMUTABLE = True
+    if not os.getenv("VDB_SQLITE_JOURNAL_MODE"):
+        os.environ["VDB_SQLITE_JOURNAL_MODE"] = "WAL"
 
 
 def vdr_analyze_summarize(
@@ -343,13 +413,17 @@ def run_depscan(args):
             ) as vdb_download_status:
                 if not IS_CI:
                     vdb_download_status.stop()
-                # This line may exit with an exception if the database cannot be downloaded.
+                # This line may exit with an exception if the database cannot be
+                # downloaded even after retries.
                 # Example: urllib3.exceptions.IncompleteRead, urllib3.exceptions.ProtocolError, requests.exceptions.ChunkedEncodingError
-                download_image(vdb_database_url, config.DATA_DIR)
+                download_vdb_with_retries(vdb_database_url, config.DATA_DIR)
         else:
             LOG.warning(
                 "The latest vulnerability database is not found. Follow the documentation to manually download it."
             )
+    # Apply read-only SQLite tuning for the scan (T2). Done after the download
+    # so the vdb update path is never opened immutable.
+    configure_vdb_readonly()
     if args.csaf:
         toml_file_path = os.getenv("DEPSCAN_CSAF_TEMPLATE", os.path.join(src_dir, "csaf.toml"))
         if not os.path.exists(toml_file_path):
@@ -582,54 +656,11 @@ def run_depscan(args):
                 except Exception as e:
                     LOG.error(e)
                     LOG.error("Risk audit was not successful")
-        # Do we support remote audit for this type?
-        # Remote audits can improve results for some project types like npm by fetching vulnerabilities that might not yet be in our database.
-        # In v6, remote audit is disabled by default and gets enabled with risk audit
-        #
-        # NOTE: Enabling risk audit may lead to some precision loss in reachability results.
-        #   This is a known limitation with no immediate plan for resolution.
-        if perform_risk_audit and project_type in type_audit_map:
-            LOG.debug(
-                "Performing remote audit for %s of type %s",
-                src_dir,
-                project_type,
-            )
-            LOG.debug("No of packages %d", len(pkg_list))
-            try:
-                audit_results = audit(project_type, pkg_list)
-                if audit_results:
-                    LOG.debug("Remote audit yielded %d results", len(audit_results))
-                    results = results + audit_results
-            except Exception as e:
-                LOG.error("Remote audit was not successful")
-                LOG.error(e)
-                results = []
-        # In case of docker, bom, or universal type, check if there are any
-        # npm packages that can be audited remotely
-        if perform_risk_audit and project_type in (
-            "podman",
-            "docker",
-            "oci",
-            "container",
-            "bom",
-            "universal",
-        ):
-            npm_pkg_list = get_pkg_by_type(pkg_list, "npm")
-            if npm_pkg_list:
-                LOG.debug("No of npm packages %d", len(npm_pkg_list))
-                try:
-                    audit_results = audit("nodejs", npm_pkg_list)
-                    if audit_results:
-                        LOG.debug(
-                            "Remote audit yielded %d results",
-                            len(audit_results),
-                        )
-                        results = results + audit_results
-                except Exception as e:
-                    LOG.error("Remote audit was not successful")
-                    LOG.error(e)
-        else:
-            LOG.debug("Vulnerability database loaded from %s", config.VDB_BIN_FILE)
+        # Remote npm advisory audit was removed: the npmjs security endpoints
+        # (/-/npm/v1/security/audits and /-/npm/v1/security/advisories) were
+        # permanently retired upstream, so vdb's NpmSource.bulk_search now
+        # returns nothing. Those advisories are served from the local VDB via
+        # the purl search path instead.
         if len(pkg_list) > 1:
             if project_type == "bom":
                 LOG.info("Scanning CycloneDX xBOMs and atom slices")

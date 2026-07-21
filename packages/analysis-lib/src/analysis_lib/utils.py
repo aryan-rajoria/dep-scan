@@ -169,13 +169,26 @@ def remove_extra_metadata(vdrs):
 
 
 def dedupe_vdrs(vdrs):
+    # Issue #504: key primarily by vulnerability id so that multiple components
+    # affected by the same CVE merge into a single VDR entry with multiple
+    # affects[].ref. Falls back to bom-ref (exact duplicate) and then to the
+    # original index (never collapse unrelated entries).
     new_vdrs = {}
-    for vdr in vdrs:
-        if vdr.get("bom-ref", "") in new_vdrs:
-            new_vdrs[vdr["bom-ref"]] = combine_vdrs(new_vdrs[vdr["bom-ref"]], vdr)
+    order = []
+    for idx, vdr in enumerate(vdrs):
+        vuln_id = vdr.get("id")
+        if vuln_id:
+            key = ("id", vuln_id)
+        elif vdr.get("bom-ref"):
+            key = ("bom-ref", vdr["bom-ref"])
         else:
-            new_vdrs[vdr["bom-ref"]] = vdr
-    return list(new_vdrs.values())
+            key = ("idx", idx)
+        if key in new_vdrs:
+            new_vdrs[key] = combine_vdrs(new_vdrs[key], vdr)
+        else:
+            new_vdrs[key] = vdr
+            order.append(key)
+    return [new_vdrs[k] for k in order]
 
 
 def format_system_name(system_name):
@@ -270,6 +283,26 @@ def combine_generic(v1, v2, keys):
     return v3
 
 
+def combine_values(v1, v2):
+    """Combine two lists of scalar values preserving order and dropping dups"""
+    if not v1 and not v2:
+        return []
+    seen = set()
+    v3 = []
+    for item in list(v1 or []) + list(v2 or []):
+        if item not in seen:
+            v3.append(item)
+            seen.add(item)
+    return v3
+
+
+def _is_prioritized(vdr):
+    for prop in vdr.get("properties", []) or []:
+        if prop.get("name") == "depscan:prioritized" and prop.get("value") == "true":
+            return True
+    return False
+
+
 def combine_references(v1, v2):
     if not v1 and not v2:
         return []
@@ -284,12 +317,16 @@ def combine_references(v1, v2):
 
 
 def combine_vdrs(v1, v2):
+    # Prefer the bom-ref of the prioritized entry so console grouping
+    # (include_pkg_group_rows) still attributes the merged entry correctly
+    # when only one of two versions was reachable/prioritized. See #504.
+    preferred = v2 if _is_prioritized(v2) and not _is_prioritized(v1) else v1
     return {
         "advisories": combine_references(v1.get("advisories", []), v2.get("advisories", [])),
         "affects": combine_affects(v1.get("affects", []), v2.get("affects", [])),
         "analysis": v1.get("analysis", "") or v2.get("analysis", ""),
-        "bom-ref": v1.get("bom-ref"),
-        "cwes": list(set(v1["cwes"] + v2["cwes"])),
+        "bom-ref": preferred.get("bom-ref"),
+        "cwes": list(set((v1.get("cwes") or []) + (v2.get("cwes") or []))),
         "detail": v1.get("detail", "") or v2.get("detail", ""),
         "description": v1.get("description", "") or v2.get("description", ""),
         "id": v1.get("id"),
@@ -306,8 +343,10 @@ def combine_vdrs(v1, v2):
         "references": combine_references(v1.get("references", []), v2.get("references", [])),
         "source": v1.get("source", "") or v2.get("source", ""),
         "updated": choose_date(v1.get("updated"), v2.get("updated"), "max"),
-        "p_rich_tree": v1.get("p_rich_tree") or v2.get("p_rich_tree"),
-        "insights": v1.get("insights") or v2.get("insights"),
+        "p_rich_tree": preferred.get("p_rich_tree")
+        or v1.get("p_rich_tree")
+        or v2.get("p_rich_tree"),
+        "insights": combine_values(v1.get("insights"), v2.get("insights")),
         "purl_prefix": v1.get("purl_prefix") or v2.get("purl_prefix"),
         "fixed_location": v1.get("fixed_location") or v2.get("fixed_location"),
     }

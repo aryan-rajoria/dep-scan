@@ -15,7 +15,6 @@ from quart import Quart, request
 from rich.console import Console
 from server_lib import ServerOptions
 from vdb.lib import search
-from vdb.lib.npm import NpmSource
 
 app = Quart(f"dep-scan server ({__name__})", static_folder=None)
 app.config.from_prefixed_env(prefix="DEPSCAN_SERVER")
@@ -33,16 +32,6 @@ def get_allowed_git_schemes(default_schemes=None):
 
 allowed_git_schemes = get_allowed_git_schemes()
 
-# Dict mapping project type to the audit source
-type_audit_map = {
-    "nodejs": NpmSource(),
-    "js": NpmSource(),
-    "javascript": NpmSource(),
-    "ts": NpmSource(),
-    "typescript": NpmSource(),
-    "npm": NpmSource(),
-}
-npm_app_info = {"name": "owasp-depscan-server", "version": "6.3.0"}
 
 console = Console(
     log_time=False,
@@ -222,18 +211,6 @@ def _get_request_api_key() -> str | None:
     if auth_header.startswith("Bearer "):
         return auth_header.removeprefix("Bearer ").strip()
     return request.headers.get("X-API-Key")
-
-
-def audit(project_type, pkg_list):
-    """
-    Method to audit packages using remote source such as npm advisory
-
-    :param project_type: Project type
-    :param pkg_list: List of packages
-    :return: Results
-    """
-    results = type_audit_map[project_type].bulk_search(app_info=npm_app_info, pkg_list=pkg_list)
-    return results
 
 
 @app.get("/")
@@ -469,11 +446,6 @@ async def run_scan():
         # Direct purl-based lookups are not supported yet.
         if bom_file_path is not None:
             pkg_list, _ = get_pkg_list(bom_file_path)
-            # Here we are assuming there will be only one type
-            if len(project_type_list) == 1 and project_type_list[0] in type_audit_map:
-                audit_results = audit(project_type_list[0], pkg_list)
-                if audit_results:
-                    results = results + audit_results
             if not pkg_list:
                 if logger_instance:
                     logger_instance.debug("Empty package search attempted!")

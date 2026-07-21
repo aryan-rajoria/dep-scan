@@ -4,7 +4,7 @@ LABEL maintainer="OWASP Foundation" \
       org.opencontainers.image.authors="Team AppThreat <cloud@appthreat.com>" \
       org.opencontainers.image.source="https://github.com/owasp-dep-scan/dep-scan" \
       org.opencontainers.image.url="https://owasp.org/www-project-dep-scan" \
-      org.opencontainers.image.version="6.2.x" \
+      org.opencontainers.image.version="6.3.x" \
       org.opencontainers.image.vendor="owasp-dep-scan" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.title="dep-scan" \
@@ -13,10 +13,10 @@ LABEL maintainer="OWASP Foundation" \
 
 ARG TARGETPLATFORM
 ARG JAVA_VERSION=26.0.1-tem
-ARG MAVEN_VERSION=3.9.15
-ARG GRADLE_VERSION=9.5.0
+ARG MAVEN_VERSION=3.9.16
+ARG GRADLE_VERSION=9.6.1
 ARG PYTHON_VERSION=3.12
-ARG GO_VERSION=1.26.3
+ARG GO_VERSION=1.26.5
 
 ENV GOPATH=/opt/app-root/go \
     GO_VERSION=$GO_VERSION \

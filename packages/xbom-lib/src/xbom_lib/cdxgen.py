@@ -21,7 +21,7 @@ cdxgen_server_headers = {
 CDXGEN_TIMEOUT_MS = os.getenv("CDXGEN_TIMEOUT_MS", str(int(30 * 60 * 1000)))
 
 # version of cdxgen to use
-CDXGEN_IMAGE_VERSION = os.getenv("CDXGEN_IMAGE_VERSION", "v12.3.3")
+CDXGEN_IMAGE_VERSION = os.getenv("CDXGEN_IMAGE_VERSION", "v12.8.0")
 CDXGEN_IMAGE_ROLLING_VERSION = os.getenv("CDXGEN_IMAGE_ROLLING_VERSION", "v12")
 
 # cdxgen default image to use

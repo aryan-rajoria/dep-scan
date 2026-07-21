@@ -3,6 +3,43 @@ from types import SimpleNamespace
 from analysis_lib import utils
 
 
+def _make_vdr(
+    cve_id,
+    purl,
+    *,
+    fixed_location="",
+    insights=None,
+    properties=None,
+    matching_vers="vers:apache/>=0.0.1|<9.0.0",
+):
+    """Build a minimal vdict matching the shape returned by analyze_cve_vuln."""
+    versions = [{"range": matching_vers, "status": "affected"}]
+    if fixed_location:
+        versions.append({"version": fixed_location, "status": "unaffected"})
+    return {
+        "id": cve_id,
+        "matched_by": purl,
+        "bom-ref": f"{cve_id}/{purl}",
+        "affects": [{"ref": purl, "versions": versions}],
+        "recommendation": f"Update to version {fixed_location}." if fixed_location else "",
+        "purl_prefix": purl.split("@")[0] if "@" in purl else purl,
+        "source": {},
+        "references": [],
+        "advisories": [],
+        "cwes": [],
+        "description": "",
+        "fixed_location": fixed_location,
+        "detail": "",
+        "ratings": [],
+        "published": "",
+        "updated": "",
+        "analysis": "",
+        "insights": list(insights or []),
+        "p_rich_tree": None,
+        "properties": list(properties or []),
+    }
+
+
 def test_max_version():
     ret = utils.max_version("1.0.0")
     assert ret == "1.0.0"
@@ -170,3 +207,70 @@ def test_analyze_cve_vuln_handles_missing_cve_metadata_and_affected(monkeypatch)
     assert vdict["updated"] == ""
     assert vdict["references"] == []
     assert vdict["advisories"] == []
+
+
+# ---------------------------------------------------------------------------
+# Issue #504 — dedupe_vdrs must merge VDR entries by vulnerability id so that
+# multiple components affected by the same CVE collapse into one entry with
+# multiple affects[].ref.
+# ---------------------------------------------------------------------------
+
+
+def test_dedupe_vdrs_merges_two_versions_of_same_cve():
+    """Two versions of a package affected by the same CVE produce a single VDR
+    entry whose affects references both component purls."""
+    v1 = _make_vdr("CVE-2024-9999", "pkg:npm/postcss@8.4.31", fixed_location="8.4.50")
+    v2 = _make_vdr("CVE-2024-9999", "pkg:npm/postcss@8.4.49", fixed_location="8.4.50")
+
+    result = utils.dedupe_vdrs([v1, v2])
+
+    assert len(result) == 1
+    refs = {a["ref"] for a in result[0]["affects"]}
+    assert refs == {"pkg:npm/postcss@8.4.31", "pkg:npm/postcss@8.4.49"}
+
+
+def test_dedupe_vdrs_preserves_differing_fix_versions():
+    """When two versions have different fix versions, each ref retains its own
+    unaffected (fix) version in the merged affects."""
+    v1 = _make_vdr("CVE-2024-8888", "pkg:npm/demo@1.0.0", fixed_location="2.0.0")
+    v2 = _make_vdr("CVE-2024-8888", "pkg:npm/demo@1.5.0", fixed_location="3.0.0")
+
+    result = utils.dedupe_vdrs([v1, v2])
+
+    assert len(result) == 1
+    fix_by_ref = {}
+    for aff in result[0]["affects"]:
+        for ver in aff["versions"]:
+            if ver.get("status") == "unaffected":
+                fix_by_ref[aff["ref"]] = ver.get("version")
+    assert fix_by_ref == {
+        "pkg:npm/demo@1.0.0": "2.0.0",
+        "pkg:npm/demo@1.5.0": "3.0.0",
+    }
+
+
+def test_dedupe_vdrs_preserves_reachable_insight_and_bom_ref():
+    """When only one of two merged versions is reachable, the reachable badge
+    survives the merge and the prioritized entry's bom-ref is kept so console
+    grouping attributes correctly."""
+    v1 = _make_vdr(
+        "CVE-2024-7777",
+        "pkg:npm/scope/pkg@1.0.0",
+        insights=["Has PoC"],
+    )
+    v2 = _make_vdr(
+        "CVE-2024-7777",
+        "pkg:npm/scope/pkg@2.0.0",
+        insights=[":receipt: Reachable"],
+        properties=[{"name": "depscan:prioritized", "value": "true"}],
+    )
+
+    result = utils.dedupe_vdrs([v1, v2])
+
+    assert len(result) == 1
+    merged = result[0]
+    # The reachable badge from v2 must not be shadowed by v1's non-empty insights
+    assert ":receipt: Reachable" in merged["insights"]
+    assert "Has PoC" in merged["insights"]
+    # bom-ref of the prioritized entry is preferred for console grouping
+    assert merged["bom-ref"] == "CVE-2024-7777/pkg:npm/scope/pkg@2.0.0"

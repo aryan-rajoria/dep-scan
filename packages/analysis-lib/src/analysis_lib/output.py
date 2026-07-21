@@ -51,32 +51,33 @@ def get_tree_style(purl, p):
     return Style(color="#7C8082", bold=False, italic=True)
 
 
-def pkg_sub_tree(
-    purl,
-    full_pkg,
-    bom_dependency_tree,
-    pkg_severity="unknown",
-    as_tree=False,
-    extra_text=None,
-):
-    """
-    Method to locate and return a package tree from a dependency tree
+# Per-run memoization of the (purl -> located path) lookup. The dependency tree
+# is constant for the duration of a scan, and analyze_cve_vuln calls pkg_sub_tree
+# once per vulnerability — so a package with N CVEs re-scans the whole tree N
+# times. Locating the path depends only on purl + the tree, so we cache it keyed
+# on purl and invalidate whenever a different tree object is seen (id change),
+# which bounds the cache to a single tree's worth of entries.
+_LOCATE_CACHE: dict[str, list] = {}
+_LOCATE_CACHE_TREE_ID: int | None = None
 
-    :param purl: The package purl to compare.
-    :param full_pkg: The package reference to check against purl.
-    :param bom_dependency_tree: The dependency tree.
-    :param pkg_severity: The severity of the package vulnerability.
-    :param as_tree: Flag indicating whether to return as a rich tree object.
-    :param extra_text: Additional text to append to the display string.
+
+def _locate_pkg_tree(purl, bom_dependency_tree) -> list:
+    """Locate the dependency path (list of refs) for ``purl`` in the tree.
+
+    Two passes over ``bom_dependency_tree`` (skipping the root at index 0):
+    collect the refs that contain ``purl`` / the first parent that depends on
+    it, then walk up one more level to attach the parent's parent. Result is
+    memoized per tree so repeated vulns on the same package are O(1).
     """
-    pkg_tree = []
-    if full_pkg and not purl:
-        purl = full_pkg
-    if not bom_dependency_tree:
-        return [purl], Tree(
-            label=get_pkg_display(purl, purl, extra_text=extra_text),
-            style=Style(color="bright_red" if pkg_severity.upper() == "CRITICAL" else None),
-        )
+    global _LOCATE_CACHE_TREE_ID
+    tree_id = id(bom_dependency_tree)
+    if tree_id != _LOCATE_CACHE_TREE_ID:
+        _LOCATE_CACHE.clear()
+        _LOCATE_CACHE_TREE_ID = tree_id
+    cached = _LOCATE_CACHE.get(purl)
+    if cached is not None:
+        return cached
+    pkg_tree: list = []
     if len(bom_dependency_tree) > 1:
         for dep in bom_dependency_tree[1:]:
             ref = dep.get("ref")
@@ -95,19 +96,49 @@ def pkg_sub_tree(
                 if dep.get("ref") not in pkg_tree:
                     pkg_tree.insert(0, dep.get("ref"))
                 break
-        if as_tree and pkg_tree:
-            tree = Tree(
-                label=get_pkg_display(purl, pkg_tree[0], extra_text=extra_text),
-                style=get_tree_style(purl, pkg_tree[0]),
-            )
-            if len(pkg_tree) > 1:
-                subtree = tree
-                for p in pkg_tree[1:]:
-                    subtree = subtree.add(
-                        label=get_pkg_display(purl, p, extra_text=extra_text),
-                        style=get_tree_style(purl, p),
-                    )
-            return pkg_tree, tree
+    _LOCATE_CACHE[purl] = pkg_tree
+    return pkg_tree
+
+
+def pkg_sub_tree(
+    purl,
+    full_pkg,
+    bom_dependency_tree,
+    pkg_severity="unknown",
+    as_tree=False,
+    extra_text=None,
+):
+    """
+    Method to locate and return a package tree from a dependency tree
+
+    :param purl: The package purl to compare.
+    :param full_pkg: The package reference to check against purl.
+    :param bom_dependency_tree: The dependency tree.
+    :param pkg_severity: The severity of the package vulnerability.
+    :param as_tree: Flag indicating whether to return as a rich tree object.
+    :param extra_text: Additional text to append to the display string.
+    """
+    if full_pkg and not purl:
+        purl = full_pkg
+    if not bom_dependency_tree:
+        return [purl], Tree(
+            label=get_pkg_display(purl, purl, extra_text=extra_text),
+            style=Style(color="bright_red" if pkg_severity.upper() == "CRITICAL" else None),
+        )
+    pkg_tree = _locate_pkg_tree(purl, bom_dependency_tree)
+    if pkg_tree and len(bom_dependency_tree) > 1 and as_tree:
+        tree = Tree(
+            label=get_pkg_display(purl, pkg_tree[0], extra_text=extra_text),
+            style=get_tree_style(purl, pkg_tree[0]),
+        )
+        if len(pkg_tree) > 1:
+            subtree = tree
+            for p in pkg_tree[1:]:
+                subtree = subtree.add(
+                    label=get_pkg_display(purl, p, extra_text=extra_text),
+                    style=get_tree_style(purl, p),
+                )
+        return pkg_tree, tree
     return pkg_tree, Tree(
         label=get_pkg_display(purl, purl, extra_text=extra_text),
         style=Style(color="bright_red" if pkg_severity.upper() == "CRITICAL" else None),

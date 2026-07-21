@@ -70,7 +70,13 @@ def get_licenses(ele):
     :return A list of extracted licenses
     """
     license_list = []
-    namespace = "{http://cyclonedx.org/schema/bom/1.5}"
+    # Extract the XML namespace from the element tag so the parser is
+    # version-agnostic. CycloneDX XML embeds the spec version in the namespace
+    # URI (…/schema/bom/1.5 | 1.6 | 1.7 | 2.0). Hardcoding a single version
+    # silently misses licenses on newer BOMs.
+    namespace = ""
+    if ele.tag.startswith("{"):
+        namespace = ele.tag.split("}", 1)[0] + "}"
     for data in ele.findall(f"{namespace}licenses/{namespace}license/{namespace}id"):
         license_list.append(data.text)
     if not license_list:
@@ -411,6 +417,9 @@ def update_tools_metadata(tools, bom_data, ds_version):
         now_utc = datetime.now(timezone.utc)
         bom_data = {
             "bomFormat": "CycloneDX",
+            # Default spec for from-scratch VDRs (no source BOM). When a source
+            # BOM exists, export_bom preserves its specVersion verbatim so a
+            # 1.7 BOM from cdxgen 12.8 stays 1.7 (never downgraded).
             "specVersion": "1.6",
             "serialNumber": f"urn:uuid:{uuid.uuid4()}",
             "version": 1,

@@ -109,3 +109,30 @@ Component count: 230
 """
     )
     os.remove("rendered.report")
+
+
+def test_configure_vdb_readonly_defaults(monkeypatch):
+    """T2: immutable + WAL are the defaults for scan runs."""
+    from depscan.cli import configure_vdb_readonly
+    from vdb.lib import config as vdb_config
+
+    monkeypatch.delenv("VDB_SQLITE_IMMUTABLE", raising=False)
+    monkeypatch.delenv("VDB_SQLITE_JOURNAL_MODE", raising=False)
+    configure_vdb_readonly()
+    assert os.environ["VDB_SQLITE_IMMUTABLE"] == "true"
+    assert os.environ["VDB_SQLITE_JOURNAL_MODE"] == "WAL"
+    assert vdb_config.VDB_SQLITE_IMMUTABLE is True
+
+
+def test_configure_vdb_readonly_respects_user_override(monkeypatch):
+    """T2: explicit user overrides are not clobbered."""
+    from depscan.cli import configure_vdb_readonly
+    from vdb.lib import config as vdb_config
+
+    monkeypatch.setenv("VDB_SQLITE_IMMUTABLE", "false")
+    monkeypatch.setenv("VDB_SQLITE_JOURNAL_MODE", "DELETE")
+    vdb_config.VDB_SQLITE_IMMUTABLE = False
+    configure_vdb_readonly()
+    assert os.environ["VDB_SQLITE_IMMUTABLE"] == "false"
+    assert os.environ["VDB_SQLITE_JOURNAL_MODE"] == "DELETE"
+    assert vdb_config.VDB_SQLITE_IMMUTABLE is False
