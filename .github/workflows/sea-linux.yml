@@ -1,0 +1,226 @@
+name: Build Linux SEA Binaries
+
+# Builds single-file PyInstaller `--onefile` binaries of depscan for Linux
+# (glibc amd64 + arm64) with the matching cdxgen SEA binary bundled under
+# `local_bin/`. The frozen binary therefore produces a CycloneDX BOM + VDR
+# out of the box without requiring Node.js or an `npm install cdxgen`.
+#
+# See `/Users/prabhu/depscan-sea-plan.md` Phase 1 for the design.
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+      - feature/sea
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  Depscan-SEA-Linux-Build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
+            binary_name: depscan-linux-amd64
+            cdxgen_asset: cdxgen-linux-amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            binary_name: depscan-linux-arm64
+            cdxgen_asset: cdxgen-linux-arm64
+    # `contents: write` is required only for `softprops/action-gh-release` to
+    # attach binaries to a tag release. No other elevated permissions are
+    # needed for this workflow.
+    permissions:
+      contents: write
+
+    env:
+      # Python for the SEA build. 3.14 has full native-wheel coverage for
+      # apsw / lief / pydantic_core / rpds / cryptography and matches the
+      # version blint ships its binaries with.
+      PYTHON_VERSION: '3.14'
+      # Keep the bundled cdxgen SEA version in sync with
+      # CDXGEN_IMAGE_VERSION in packages/xbom-lib/src/xbom_lib/cdxgen.py.
+      CDXGEN_SEA_VERSION: 'v12.8.0'
+      FORCE_COLOR: '1'
+      PYTHONUTF8: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify version consistency
+        # Fail fast before spending build minutes: assert pyproject.toml,
+        # build/assets/*, optional git tag, and CDXGEN_SEA_VERSION vs
+        # CDXGEN_IMAGE_VERSION all agree. See build/sea-hooks/verify_versions.py.
+        env:
+          CDXGEN_SEA_VERSION: ${{ env.CDXGEN_SEA_VERSION }}
+        run: python3 build/sea-hooks/verify_versions.py
+
+      - name: Free disk space
+        run: |
+          chmod +x build/assets/free_disk_space.sh
+          ./build/assets/free_disk_space.sh || true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install project and PyInstaller
+        run: |
+          uv python install ${{ env.PYTHON_VERSION }}
+          # Sync the entire uv workspace (depscan + ds-*-lib members) with
+          # all extras. depscan has no nyxstone extra, so this is safe.
+          uv sync --all-extras --all-packages
+          uv pip install "pyinstaller>=6.20.0"
+
+      - name: Download, verify and stage the cdxgen SEA binary
+        run: |
+          set -euo pipefail
+          mkdir -p build/local_bin
+          base="https://github.com/cdxgen/cdxgen/releases/download/${CDXGEN_SEA_VERSION}"
+          echo "Downloading ${{ matrix.cdxgen_asset }} from ${base}"
+          curl -fL "${base}/${{ matrix.cdxgen_asset }}" -o build/local_bin/cdxgen
+          curl -fL "${base}/${{ matrix.cdxgen_asset }}.sha256" -o build/local_bin/cdxgen.sha256
+          # cdxgen .sha256 files are formatted as "<hex>  <name>". Extract
+          # the hex from the first field so the comparison is format-independent.
+          expected="$(awk '{print $1}' build/local_bin/cdxgen.sha256)"
+          actual="$(sha256sum build/local_bin/cdxgen | awk '{print $1}')"
+          if [ "${expected}" != "${actual}" ]; then
+            echo "::error::cdxgen sha256 mismatch: expected ${expected}, got ${actual}"
+            exit 1
+          fi
+          echo "cdxgen sha256 verified: ${actual}"
+          chmod +x build/local_bin/cdxgen
+          # Confirm the staged cdxgen SEA runs natively before we bundle it.
+          build/local_bin/cdxgen --version
+          ls -la build/local_bin/
+
+      - name: Build the depscan SEA binary (PyInstaller --onefile)
+        run: |
+          set -euo pipefail
+          uv run pyinstaller depscan/cli.py \
+            --noconfirm --log-level=WARN --nowindow --onefile \
+            --name ${{ matrix.binary_name }} \
+            --add-data="vendor:vendor" \
+            --add-data="packages/analysis-lib/src/analysis_lib/vex/data:analysis_lib/vex/data" \
+            --add-binary="build/local_bin/cdxgen:local_bin" \
+            --collect-submodules depscan \
+            --collect-submodules xbom_lib \
+            --collect-all analysis_lib \
+            --collect-data reporting_lib \
+            --collect-submodules server_lib \
+            --collect-all apsw \
+            --collect-all lief \
+            --collect-submodules oras \
+            --hidden-import=apsw \
+            --hidden-import=pydantic_core \
+            --hidden-import=rpds \
+            --hidden-import=_cffi_backend \
+            --noupx
+          ls -la dist/
+
+      - name: Smoke test - --version and --help
+        run: |
+          set -euo pipefail
+          echo "::group::depscan --version"
+          ./dist/${{ matrix.binary_name }} --version
+          echo "::endgroup::"
+          echo "::group::depscan --help (first 10 lines)"
+          ./dist/${{ matrix.binary_name }} --help | head -10
+          echo "::endgroup::"
+
+      - name: Smoke test - real scan using the BUNDLED cdxgen
+        env:
+          # Use the smaller 2-year app-only vuln DB image so the smoke test
+          # doesn't pull the full (default) database.
+          VDB_DATABASE_URL: "ghcr.io/appthreat/vdbxz-app-2y:v6.7.x"
+          SCAN_DEBUG_MODE: debug
+          # Deliberately leave CDXGEN_CMD unset and assert cdxgen is NOT on
+          # PATH so we know find_cdxgen_cmd() falls back to local_bin/cdxgen
+          # extracted from _MEIPASS.
+        run: |
+          set -euo pipefail
+          if command -v cdxgen >/dev/null 2>&1; then
+            echo "::error::cdxgen found on PATH at $(command -v cdxgen); smoke test would not exercise the bundled binary"
+            exit 1
+          fi
+          echo "Confirmed: no cdxgen on PATH. The frozen binary must use local_bin/cdxgen."
+
+          # Create a small Python fixture for cdxgen to discover.
+          rm -rf /tmp/sea-fixture /tmp/sea-reports
+          mkdir -p /tmp/sea-fixture /tmp/sea-reports
+          printf 'requests==2.32.0\n' > /tmp/sea-fixture/requirements.txt
+
+          # Run a real scan. --csaf exercises CSAF VEX schema loading
+          # (analysis_lib.vex.data), the HTML report exercises reporting_lib
+          # templates, and license scanning touches vendor/.
+          ./dist/${{ matrix.binary_name }} \
+            --src /tmp/sea-fixture \
+            -o /tmp/sea-reports \
+            --csaf \
+            --no-banner
+
+          echo "::group::reports dir"
+          ls -la /tmp/sea-reports/
+          echo "::endgroup::"
+
+          # BOM + VDR must be produced via the bundled cdxgen.
+          found_bom=0
+          for f in /tmp/sea-reports/*bom*.json /tmp/sea-reports/*.vdr.json; do
+            [ -e "$f" ] && { found_bom=1; break; }
+          done
+          if [ "${found_bom}" -ne 1 ]; then
+            echo "::error::No BOM/VDR file produced; bundled cdxgen likely did not run."
+            exit 1
+          fi
+
+          # CSAF VEX output exercises the bundled CSAF + CVSS schemas.
+          if ! ls /tmp/sea-reports/*.csaf.json >/dev/null 2>&1; then
+            echo "::error::No CSAF VEX document produced; VEX schema data not bundled."
+            exit 1
+          fi
+
+          # HTML report exercises reporting_lib templates.
+          if ! ls /tmp/sea-reports/*.html >/dev/null 2>&1; then
+            echo "::error::No HTML report produced; reporting_lib templates not bundled."
+            exit 1
+          fi
+
+          echo "Smoke test passed: BOM/VDR, CSAF VEX and HTML report all produced."
+
+      - name: Generate .sha256
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum ${{ matrix.binary_name }} > ${{ matrix.binary_name }}.sha256
+          echo "::group::sha256"
+          cat ${{ matrix.binary_name }}.sha256
+          echo "::endgroup::"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ matrix.binary_name }}
+          path: |
+            dist/${{ matrix.binary_name }}
+            dist/${{ matrix.binary_name }}.sha256
+          if-no-files-found: error
+
+      - name: Attach binaries to release on tag
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/${{ matrix.binary_name }}
+            dist/${{ matrix.binary_name }}.sha256

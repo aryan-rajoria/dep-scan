@@ -1,0 +1,378 @@
+name: Build macOS SEA Binaries
+
+# Builds single-file PyInstaller `--onefile` binaries of depscan for macOS
+# (arm64 + amd64) with the matching cdxgen SEA binary bundled under
+# `local_bin/`. The frozen binary therefore produces a CycloneDX BOM + VDR
+# out of the box without requiring Node.js or an `npm install cdxgen`.
+#
+# v1 ships UNSIGNED single-arch binaries (matches blint's merged mac.yml).
+# A secrets-gated codesign + notarize step is included for future use and
+# no-ops gracefully when the Apple secrets are absent.
+#
+# See `/Users/prabhu/depscan-sea-plan.md` Phase 4 for the design.
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+      - feature/sea
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  Depscan-SEA-Mac-Build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+            binary_name: depscan-darwin-arm64
+            cdxgen_asset: cdxgen-darwin-arm64
+          - os: macos-15-intel
+            arch: amd64
+            binary_name: depscan-darwin-amd64
+            cdxgen_asset: cdxgen-darwin-amd64
+    # `contents: write` is required only for `softprops/action-gh-release` to
+    # attach binaries to a tag release. No other elevated permissions are
+    # needed for this workflow.
+    permissions:
+      contents: write
+
+    env:
+      # Python for the SEA build. 3.14 has full native-wheel coverage for
+      # apsw / lief / pydantic_core / rpds / cryptography on macOS and matches
+      # the version the other SEA workflows ship with.
+      PYTHON_VERSION: '3.14'
+      # Keep the bundled cdxgen SEA version in sync with
+      # CDXGEN_IMAGE_VERSION in packages/xbom-lib/src/xbom_lib/cdxgen.py.
+      CDXGEN_SEA_VERSION: 'v12.8.0'
+      FORCE_COLOR: '1'
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: 'utf-8'
+      LANG: 'en_US.utf-8'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify version consistency
+        # Fail fast before spending build minutes: assert pyproject.toml,
+        # build/assets/*, optional git tag, and CDXGEN_SEA_VERSION vs
+        # CDXGEN_IMAGE_VERSION all agree. See build/sea-hooks/verify_versions.py.
+        run: python3 build/sea-hooks/verify_versions.py
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install project and PyInstaller
+        run: |
+          set -euo pipefail
+          uv python install ${{ env.PYTHON_VERSION }}
+          # Sync the entire uv workspace (depscan + ds-*-lib members) with
+          # all extras. depscan has no nyxstone extra, so this is safe.
+          uv sync --all-extras --all-packages
+          uv pip install "pyinstaller>=6.20.0"
+
+      - name: Assert nyxstone is NOT installed
+        # depscan does not ship nyxstone (the disassembler is a blint
+        # extended extra). If it ever appears in the venv the binary size
+        # balloons and we'd pull LLVM at runtime; fail fast instead.
+        run: |
+          set -euo pipefail
+          if uv pip list | grep -qi nyxstone; then
+            echo "::error::nyxstone is unexpectedly installed; the macOS SEA binary must not ship it."
+            uv pip list | grep -i nyxstone
+            exit 1
+          fi
+          echo "Confirmed: nyxstone absent from the venv. blint disassembly features that require it will be unavailable in the macOS binary (expected)."
+
+      - name: Download, verify and stage the cdxgen SEA binary
+        run: |
+          set -euo pipefail
+          mkdir -p build/local_bin
+          base="https://github.com/cdxgen/cdxgen/releases/download/${CDXGEN_SEA_VERSION}"
+          echo "Downloading ${{ matrix.cdxgen_asset }} from ${base}"
+          curl -fL "${base}/${{ matrix.cdxgen_asset }}" -o build/local_bin/cdxgen
+          curl -fL "${base}/${{ matrix.cdxgen_asset }}.sha256" -o build/local_bin/cdxgen.sha256
+          # cdxgen .sha256 files are formatted as "<hex>  <name>". Extract
+          # the hex from the first field so the comparison is format-independent.
+          expected="$(awk '{print $1}' build/local_bin/cdxgen.sha256)"
+          actual="$(shasum -a 256 build/local_bin/cdxgen | awk '{print $1}')"
+          if [ "${expected}" != "${actual}" ]; then
+            echo "::error::cdxgen sha256 mismatch: expected ${expected}, got ${actual}"
+            exit 1
+          fi
+          echo "cdxgen sha256 verified: ${actual}"
+          chmod +x build/local_bin/cdxgen
+          # curl on macOS runners does not set the quarantine xattr, but be
+          # defensive: clear any xattrs so Gatekeeper never blocks the
+          # preflight --version below or the PyInstaller-bundled exec.
+          xattr -cr build/local_bin/cdxgen || true
+          # Diagnostic: the cdxgen SEA is a Node.js Single Executable
+          # Application whose Mach-O has a non-standard embedded blob
+          # segment. codesign refuses to re-sign it ("internal error in
+          # Code Signing subsystem"), so we keep the signature the cdxgen
+          # build process produced and never re-sign the bundled cdxgen.
+          echo "::group::cdxgen Mach-O info"
+          file build/local_bin/cdxgen
+          lipo -info build/local_bin/cdxgen || true
+          codesign -dv build/local_bin/cdxgen 2>&1 || true
+          echo "::endgroup::"
+          # Confirm the staged cdxgen SEA runs natively before we disguise
+          # it for PyInstaller. If the existing adhoc,linker-signed signature
+          # (flags=0x20002) were invalid on arm64, the kernel would kill the
+          # exec here and we'd know to revisit.
+          build/local_bin/cdxgen --version
+          # Disguise cdxgen's Mach-O magic so PyInstaller's auto-detection
+          # (which reads the first 4 bytes of every bundled file, regardless
+          # of --add-data vs --add-binary) skips it. Without this disguise,
+          # PyInstaller calls codesign on cdxgen, which fails with
+          # "internal error in Code Signing subsystem" because the Node.js
+          # SEA layout (node binary + postject-injected blob) is non-standard.
+          # The build/sea-hooks/rt-depscan-cdxgen.py runtime hook restores
+          # the original Mach-O 64-bit magic (\xcf\xfa\xed\xfe) at frozen
+          # startup before depscan's main entry runs.
+          echo "::group::disguise cdxgen Mach-O magic"
+          ls -la build/local_bin/cdxgen
+          printf '\x00\x00\x00\x00' | dd of=build/local_bin/cdxgen bs=4 count=1 conv=notrunc status=none
+          # Sanity: confirm the disguise took.
+          actual_magic="$(xxd -l 4 -p build/local_bin/cdxgen)"
+          if [ "${actual_magic}" != "00000000" ]; then
+            echo "::error::Failed to disguise cdxgen Mach-O magic; got ${actual_magic}"
+            exit 1
+          fi
+          echo "cdxgen Mach-O magic zeroed (was $(printf '\xcf\xfa\xed\xfe' | xxd -p 2>/dev/null || echo cffaedfe), now 00000000)."
+          echo "::endgroup::"
+          ls -la build/local_bin/
+
+      - name: Build the depscan SEA binary (PyInstaller --onefile)
+        # The bundled cdxgen SEA is a Node.js Single Executable Application
+        # whose Mach-O layout (node binary + injected blob) trips codesign
+        # with "internal error in Code Signing subsystem" on every re-sign
+        # attempt. PyInstaller auto-detects Mach-O by reading the first 4
+        # bytes of every bundled file, so even --add-data triggers the
+        # re-sign path. We therefore zeroed cdxgen's Mach-O magic in the
+        # staging step above, and bundle this runtime hook that restores
+        # the original magic (\xcf\xfa\xed\xfe) at frozen startup before
+        # depscan's main entry point runs.
+        run: |
+          set -euo pipefail
+          uv run pyinstaller depscan/cli.py \
+            --noconfirm --log-level=WARN --nowindow --onefile \
+            --name ${{ matrix.binary_name }} \
+            --icon build/assets/depscan.icns \
+            --runtime-hook=build/sea-hooks/rt-depscan-cdxgen.py \
+            --add-data="vendor:vendor" \
+            --add-data="packages/analysis-lib/src/analysis_lib/vex/data:analysis_lib/vex/data" \
+            --add-data="build/local_bin/cdxgen:local_bin" \
+            --collect-submodules depscan \
+            --collect-submodules xbom_lib \
+            --collect-all analysis_lib \
+            --collect-data reporting_lib \
+            --collect-submodules server_lib \
+            --collect-all apsw \
+            --collect-all lief \
+            --collect-submodules oras \
+            --hidden-import=apsw \
+            --hidden-import=pydantic_core \
+            --hidden-import=rpds \
+            --hidden-import=_cffi_backend \
+            --noupx
+          # Post-sign the final depscan binary ad-hoc. The depscan Mach-O
+          # is a normal executable (PyInstaller's bootloader) and signs
+          # cleanly. arm64 macOS refuses to exec unsigned binaries, so this
+          # is required even for the unsigned v1 distribution.
+          codesign -s - --force --all-architectures dist/${{ matrix.binary_name }}
+          codesign -vvv dist/${{ matrix.binary_name }}
+          ls -la dist/
+
+      - name: Smoke test - --version and --help
+        run: |
+          set -euo pipefail
+          echo "::group::depscan --version"
+          ./dist/${{ matrix.binary_name }} --version
+          echo "::endgroup::"
+          echo "::group::depscan --help (first 10 lines)"
+          ./dist/${{ matrix.binary_name }} --help | head -10
+          echo "::endgroup::"
+
+      - name: Smoke test - real scan using the BUNDLED cdxgen
+        env:
+          # Use the smaller 2-year app-only vuln DB image so the smoke test
+          # doesn't pull the full (default) database.
+          VDB_DATABASE_URL: "ghcr.io/appthreat/vdbxz-app-2y:v6.7.x"
+          SCAN_DEBUG_MODE: debug
+          # Deliberately leave CDXGEN_CMD unset and assert cdxgen is NOT on
+          # PATH so we know find_cdxgen_cmd() falls back to local_bin/cdxgen
+          # extracted from _MEIPASS.
+        run: |
+          set -euo pipefail
+          if command -v cdxgen >/dev/null 2>&1; then
+            echo "::error::cdxgen found on PATH at $(command -v cdxgen); smoke test would not exercise the bundled binary"
+            exit 1
+          fi
+          echo "Confirmed: no cdxgen on PATH. The frozen binary must use local_bin/cdxgen."
+
+          # Create a small Python fixture for cdxgen to discover.
+          rm -rf /tmp/sea-fixture /tmp/sea-reports
+          mkdir -p /tmp/sea-fixture /tmp/sea-reports
+          printf 'requests==2.32.0\n' > /tmp/sea-fixture/requirements.txt
+
+          # Run a real scan. --csaf exercises CSAF VEX schema loading
+          # (analysis_lib.vex.data), the HTML report exercises reporting_lib
+          # templates, and license scanning touches vendor/.
+          ./dist/${{ matrix.binary_name }} \
+            --src /tmp/sea-fixture \
+            -o /tmp/sea-reports \
+            --csaf \
+            --no-banner
+
+          echo "::group::reports dir"
+          ls -la /tmp/sea-reports/
+          echo "::endgroup::"
+
+          # BOM + VDR must be produced via the bundled cdxgen.
+          found_bom=0
+          for f in /tmp/sea-reports/*bom*.json /tmp/sea-reports/*.vdr.json; do
+            [ -e "$f" ] && { found_bom=1; break; }
+          done
+          if [ "${found_bom}" -ne 1 ]; then
+            echo "::error::No BOM/VDR file produced; bundled cdxgen likely did not run."
+            exit 1
+          fi
+
+          # CSAF VEX output exercises the bundled CSAF + CVSS schemas.
+          if ! ls /tmp/sea-reports/*.csaf.json >/dev/null 2>&1; then
+            echo "::error::No CSAF VEX document produced; VEX schema data not bundled."
+            exit 1
+          fi
+
+          # HTML report exercises reporting_lib templates.
+          if ! ls /tmp/sea-reports/*.html >/dev/null 2>&1; then
+            echo "::error::No HTML report produced; reporting_lib templates not bundled."
+            exit 1
+          fi
+
+          echo "Smoke test passed: BOM/VDR, CSAF VEX and HTML report all produced."
+
+      - name: Generate .sha256
+        run: |
+          set -euo pipefail
+          cd dist
+          shasum -a 256 ${{ matrix.binary_name }} > ${{ matrix.binary_name }}.sha256
+          echo "::group::sha256"
+          cat ${{ matrix.binary_name }}.sha256
+          echo "::endgroup::"
+
+      # ------------------------------------------------------------------
+      # Optional codesign + notarize path.
+      #
+      # v1 ships UNSIGNED binaries (matches blint's merged mac.yml). When
+      # the Apple secrets are added to the repo this step will activate and
+      # produce a hardened-runtime signed, notarized, and stapled binary.
+      # Otherwise it skips cleanly and the unsigned binary is uploaded as-is.
+      # ------------------------------------------------------------------
+      - name: Check codesign secrets
+        id: check_codesign
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+        run: |
+          if [ -n "${MACOS_CERT_P12_BASE64}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Codesign secrets detected; binary will be signed and notarized."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Codesign secrets absent; shipping unsigned v1 binary (matches blint's mac.yml)."
+          fi
+
+      - name: Codesign and notarize (optional, secrets-gated)
+        if: steps.check_codesign.outputs.enabled == 'true'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="depscan-sea-$(date +%s).keychain-db"
+          KEYCHAIN_PW="$(openssl rand -hex 16)"
+          security create-keychain -p "${KEYCHAIN_PW}" "${KEYCHAIN}"
+          security set-keychain-settings -lut 21600 "${KEYCHAIN}"
+          security unlock-keychain -p "${KEYCHAIN_PW}" "${KEYCHAIN}"
+
+          CERT_FILE="$(mktemp -t depscan-cert.XXXXXX).p12"
+          printf '%s' "${MACOS_CERT_P12_BASE64}" | base64 -D -o "${CERT_FILE}"
+          security import "${CERT_FILE}" -P "${MACOS_CERT_PASSWORD}" -k "${KEYCHAIN}" -T /usr/bin/codesign
+          rm -f "${CERT_FILE}"
+
+          # Allow codesign to read the key without an additional prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PW}" "${KEYCHAIN}"
+
+          SIGN_IDENTITY="$(security find-identity -v -p codesigning "${KEYCHAIN}" | grep 'Developer ID Application' | awk -F'"' '{print $2}' | head -n1)"
+          if [ -z "${SIGN_IDENTITY}" ]; then
+            echo "::error::No 'Developer ID Application' identity found in the imported keychain."
+            exit 1
+          fi
+          echo "Signing identity: ${SIGN_IDENTITY}"
+
+          BINARY="dist/${{ matrix.binary_name }}"
+          # Hardened runtime is required for notarization. Entitlements
+          # match the bare-minimum for a PyInstaller --onefile CLI binary.
+          codesign --force --options runtime --timestamp \
+            --keychain "${KEYCHAIN}" \
+            --sign "${SIGN_IDENTITY}" \
+            --entitlements build/assets/Entitlements.plist \
+            "${BINARY}"
+          codesign --verify --strict --verbose=2 "${BINARY}"
+
+          # Submit for notarization and block until completed.
+          SUBMIT_LOG="$(mktemp -t notarytool.XXXXXX)"
+          xcrun notarytool submit "${BINARY}" \
+            --apple-id "${APPLE_ID}" \
+            --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
+            --team-id "${APPLE_TEAM_ID}" \
+            --wait 2>&1 | tee "${SUBMIT_LOG}"
+
+          # notarytool --wait exits 0 on Accepted, non-zero on Rejected/Invalid.
+          # Staple the ticket so the binary validates offline.
+          xcrun stapler staple "${BINARY}"
+          xcrun stapler validate "${BINARY}"
+
+          # Re-hash the now-stapled binary so the published .sha256 matches
+          # what users will actually download.
+          shasum -a 256 "${BINARY}" | awk '{print $1}' > "dist/${{ matrix.binary_name }}.sha256"
+          echo "::group::post-sign sha256"
+          cat "dist/${{ matrix.binary_name }}.sha256"
+          echo "::endgroup::"
+
+          # Clean up the temporary keychain.
+          security delete-keychain "${KEYCHAIN}" || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ matrix.binary_name }}
+          path: |
+            dist/${{ matrix.binary_name }}
+            dist/${{ matrix.binary_name }}.sha256
+          if-no-files-found: error
+
+      - name: Attach binaries to release on tag
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/${{ matrix.binary_name }}
+            dist/${{ matrix.binary_name }}.sha256

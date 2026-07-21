@@ -16,7 +16,23 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
+# Ignore PyInstaller working-dir output under build/, but keep the reusable
+# SEA build assets tracked under build/assets/. We must not exclude the
+# parent directory itself (build/) or gitignore will refuse to re-include
+# any path under it, so we use build/* plus an explicit negation.
+build/*
+!build/assets/
+!build/assets/depscan.ico
+!build/assets/depscan.icns
+!build/assets/Info.plist
+!build/assets/Entitlements.plist
+!build/assets/file_version_info.txt
+!build/assets/free_disk_space.sh
+!build/assets/config.json
+!build/assets/annotations.json
+!build/sea-hooks/
+!build/sea-hooks/rt-depscan-cdxgen.py
+!build/sea-hooks/verify_versions.py
 develop-eggs/
 dist/
 downloads/

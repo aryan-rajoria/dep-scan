@@ -13,11 +13,31 @@ from xbom_lib.cdxgen import (
     CdxgenGenerator,
     CdxgenImageBasedGenerator,
     CdxgenServerGenerator,
+    resource_path as xbom_resource_path,
 )
 from depscan.cli_options import DEFAULT_SPEC_VERSION
 from depscan.lib.logger import LOG, SPINNER, console
 from depscan.lib.utils import cleanup_license_string
 from typing import Dict, Optional
+
+
+def _has_bundled_cdxgen() -> bool:
+    """Return True if we are inside a frozen bundle that ships cdxgen.
+
+    Used by the BOM-engine picker to keep the SEA (standalone) binary from
+    reaching out to a cdxgen container image when cdxgen is already bundled
+    under ``local_bin/`` at the bundle root (``sys._MEIPASS``).
+    """
+    meipass = getattr(sys, "_MEIPASS", None)
+    if not meipass:
+        return False
+    local_bin = xbom_resource_path(
+        os.path.join(
+            "local_bin",
+            "cdxgen.exe" if sys.platform == "win32" else "cdxgen",
+        )
+    )
+    return os.path.exists(local_bin)
 
 
 def parse_bom_ref(bomstr, licenses=None):
@@ -191,6 +211,8 @@ def get_pkg_list(xmlfile):
     try:
         et = parse(xmlfile)
         root = et.getroot()
+        if root is None:
+            return pkgs
         for child in root:
             if child.tag.endswith("components"):
                 for ele in child.iter():
@@ -271,6 +293,12 @@ def create_bom(bom_file, src_dir=".", options=None):
                         "Lifecycle analysis is not supported for oci and os project types."
                     )
                     lifecycle_analysis_mode = True
+            elif _has_bundled_cdxgen():
+                # Inside a PyInstaller `--onefile` bundle we ship cdxgen under
+                # local_bin/. Use it instead of pulling a cdxgen container
+                # image: the whole point of the SEA binary is to work with no
+                # Node.js, no Docker and no network pull for BOM generation.
+                cdxgen_lib = CdxgenGenerator
             elif shutil.which(os.getenv("DOCKER_CMD", "docker")) and sys.platform != "win32":
                 cdxgen_lib = CdxgenImageBasedGenerator
     # We now have the cdxgen library to use.

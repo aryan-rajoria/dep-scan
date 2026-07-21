@@ -169,6 +169,16 @@ def find_cdxgen_cmd(use_bin=True, logger: Optional[Logger] = None):
                     )
                 return False
             cdxgen_cmd = local_bin
+            # Defensive: ensure the bundled cdxgen SEA binary is executable.
+            # PyInstaller preserves file mode for --add-binary, but some
+            # tempdir filesystems do not retain the bit on extraction.
+            if sys.platform != "win32":
+                try:
+                    current_mode = os.stat(cdxgen_cmd).st_mode
+                    if not (current_mode & 0o111):
+                        os.chmod(cdxgen_cmd, current_mode | 0o755)
+                except OSError:
+                    pass
             # Set the plugins directory as an environment variable
             os.environ["CDXGEN_PLUGINS_DIR"] = resource_path("local_bin")
             return cdxgen_cmd

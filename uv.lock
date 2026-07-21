@@ -716,6 +716,8 @@ dependencies = [
     { name = "appthreat-vulnerability-db", extra = ["oras"] },
     { name = "custom-json-diff" },
     { name = "cvss" },
+    { name = "jsonschema" },
+    { name = "referencing" },
     { name = "rich" },
     { name = "toml" },
 ]
@@ -725,6 +727,8 @@ requires-dist = [
     { name = "appthreat-vulnerability-db", extras = ["oras"], specifier = "~=6.7.2" },
     { name = "custom-json-diff", specifier = ">=2.1.6" },
     { name = "cvss", specifier = ">=3.4" },
+    { name = "jsonschema", specifier = ">=4.20" },
+    { name = "referencing", specifier = ">=0.31" },
     { name = "rich", specifier = ">=13.9.4" },
     { name = "toml", specifier = ">=0.10.2" },
 ]
