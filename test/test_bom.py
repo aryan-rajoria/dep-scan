@@ -1,11 +1,60 @@
+import json
 import os
 
 from depscan.lib.bom import (
+    create_empty_vdr,
+    determine_spec_version,
     get_pkg_by_type,
     get_pkg_list,
     parse_bom_ref,
     update_tools_metadata,
 )
+
+
+def _write_bom(path, spec_version):
+    path.write_text(json.dumps({"bomFormat": "CycloneDX", "specVersion": spec_version}))
+    return str(path)
+
+
+def test_determine_spec_version_defaults_to_1_6():
+    assert determine_spec_version([], fallback=None) == "1.6"
+
+
+def test_determine_spec_version_uses_fallback_when_no_boms():
+    assert determine_spec_version([], fallback="1.7") == "1.7"
+
+
+def test_determine_spec_version_prefers_max_across_boms(tmp_path):
+    files = [
+        _write_bom(tmp_path / "a.json", "1.5"),
+        _write_bom(tmp_path / "b.json", "1.7"),
+        _write_bom(tmp_path / "c.json", "1.6"),
+    ]
+    # Max across SBOMs wins over the user fallback (never downgrade).
+    assert determine_spec_version(files, fallback="1.4") == "1.7"
+
+
+def test_determine_spec_version_two_zero_beats_one_x(tmp_path):
+    files = [
+        _write_bom(tmp_path / "a.json", "1.7"),
+        _write_bom(tmp_path / "b.json", "2.0"),
+    ]
+    assert determine_spec_version(files) == "2.0"
+
+
+def test_update_tools_metadata_uses_spec_version():
+    bom = update_tools_metadata(None, None, "6.0.0", spec_version="1.7")
+    assert bom["specVersion"] == "1.7"
+
+
+def test_update_tools_metadata_defaults_spec_version():
+    bom = update_tools_metadata(None, None, "6.0.0")
+    assert bom["specVersion"] == "1.6"
+
+
+def test_create_empty_vdr_threads_spec_version():
+    vdr = create_empty_vdr([], "6.0.0", spec_version="2.0")
+    assert vdr["specVersion"] == "2.0"
 
 
 def test_get_pkg():

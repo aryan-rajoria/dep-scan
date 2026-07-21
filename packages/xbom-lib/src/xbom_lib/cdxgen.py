@@ -237,6 +237,8 @@ class CdxgenGenerator(XBOMGenerator):
         args: list[str] = [cdxgen_cmd]
         args = args + (" ".join(project_type_args).split())
         args = args + ["-o", self.bom_file]
+        if options.get("spec_version"):
+            args = args + ["--spec-version", str(options.get("spec_version"))]
         if technique_args:
             args = args + (" ".join(technique_args).split())
         if options.get("deep"):
@@ -441,6 +443,8 @@ class CdxgenImageBasedGenerator(CdxgenGenerator):
         project_type_args = [f"-t {item}" for item in project_type_list]
         if project_type_args:
             run_command_args += " ".join(project_type_args).split()
+        if self.options.get("spec_version"):
+            run_command_args += ["--spec-version", str(self.options.get("spec_version"))]
         if self.options.get("profile"):
             run_command_args.append("--profile")
             run_command_args.append(self.options.get("profile", ""))

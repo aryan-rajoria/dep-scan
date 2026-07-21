@@ -9,6 +9,8 @@ dependencies = [
     "appthreat-vulnerability-db[oras]~=6.7.2",
     "custom-json-diff>=2.1.6",
     "cvss>=3.4",
+    "jsonschema>=4.20",
+    "referencing>=0.31",
     "rich>=13.9.4",
     "toml>=0.10.2"
 ]
@@ -39,6 +41,9 @@ Funding = "https://owasp.org/donate/?reponame=www-project-dep-scan&title=OWASP+d
 [build-system]
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+"analysis_lib.vex.data" = ["*.json", "cvss/*.json"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

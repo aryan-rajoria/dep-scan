@@ -1,6 +1,32 @@
+import argparse
 import os
 from depscan import get_version
 from depscan.lib import tomlparse
+
+# CycloneDX spec versions depscan can request from cdxgen. Mirrors cdxgen's
+# --spec-version choices. Defaults to 1.6 because Dependency-Track and several
+# other consumers do not yet support 1.7.
+SUPPORTED_SPEC_VERSIONS = ("1.4", "1.5", "1.6", "1.7", "2.0")
+DEFAULT_SPEC_VERSION = "1.6"
+
+
+def validate_spec_version(value):
+    """Validate/normalize a CycloneDX spec version like cdxgen does.
+
+    Accepts numeric or string forms (e.g. ``1.6``, ``"1.6"``, ``2``) and
+    returns the canonical ``major.minor`` string. Raises
+    ``argparse.ArgumentTypeError`` for anything outside the supported set.
+    """
+    try:
+        canonical = f"{float(str(value).strip()):.1f}"
+    except (TypeError, ValueError):
+        canonical = None
+    if canonical not in SUPPORTED_SPEC_VERSIONS:
+        raise argparse.ArgumentTypeError(
+            f"Invalid CycloneDX spec version '{value}'. "
+            f"Supported versions: {', '.join(SUPPORTED_SPEC_VERSIONS)}."
+        )
+    return canonical
 
 
 def build_parser():
@@ -37,6 +63,14 @@ def build_parser():
         default=False,
         dest="csaf",
         help="Generate a OASIS CSAF VEX document",
+    )
+    parser.add_argument(
+        "--csaf-version",
+        default="2.1",
+        choices=("2.0", "2.1"),
+        dest="csaf_version",
+        help="CSAF schema version to target (default: 2.1). CSAF 2.1 retains "
+        "CVSS v4 scores; 2.0 drops them because the schema has no cvss_v4 slot.",
     )
     parser.add_argument(
         "--profile",
@@ -136,6 +170,16 @@ def build_parser():
         default=os.getenv("CDXGEN_ARGS"),
         dest="cdxgen_args",
         help="Additional arguments to pass to cdxgen",
+    )
+    parser.add_argument(
+        "--spec-version",
+        type=validate_spec_version,
+        default=validate_spec_version(os.getenv("CDX_SPEC_VERSION", DEFAULT_SPEC_VERSION)),
+        dest="spec_version",
+        help="CycloneDX specification version to request from cdxgen. "
+        f"Choices: {', '.join(SUPPORTED_SPEC_VERSIONS)}. Defaults to "
+        f"{DEFAULT_SPEC_VERSION} (1.7 is not yet supported by Dependency-Track "
+        "and some other consumers).",
     )
     parser.add_argument(
         "--private-ns",
