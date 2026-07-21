@@ -3,17 +3,35 @@ import sys
 from os.path import dirname, exists, join
 
 
+def is_frozen():
+    """Return True when running inside a PyInstaller bundle."""
+    return getattr(sys, "frozen", False) and getattr(sys, "_MEIPASS", None) is not None
+
+
 def resource_path(relative_path):
     """
+    Resolve a resource path relative to the application root.
+
+    When running from source, the application root is the repository root
+    (parent of ``depscan/``), so callers pass paths prefixed with ``../..``
+    from ``depscan/lib/``. When running inside a PyInstaller ``--onefile``
+    bundle, ``sys._MEIPASS`` is the bundle root and the ``vendor/`` directory
+    is added there directly via ``--add-data``; the ``../../`` prefix must be
+    dropped so it does not escape above ``_MEIPASS``.
 
     :param relative_path:
     :return:
     """
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = dirname(__file__)
-    return join(base_path, relative_path)
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        # ``_MEIPASS`` is the bundle root; strip any leading ``../..`` that
+        # would otherwise walk above it.
+        cleaned = relative_path
+        while cleaned.startswith((".." + os.sep, "../")):
+            sep = os.sep if cleaned.startswith(".." + os.sep) else "/"
+            cleaned = cleaned.split(sep, 1)[1]
+        return join(meipass, cleaned)
+    return join(dirname(__file__), relative_path)
 
 
 license_data_dir = resource_path(

@@ -1,0 +1,258 @@
+name: Build Linux Musl SEA Binaries
+
+# Builds single-file PyInstaller `--onefile` binaries of depscan for Linux musl
+# (Alpine-compatible, amd64 + arm64) with the matching cdxgen SEA binary
+# (`cdxgen-linux-${arch}-musl`) bundled under `local_bin/`.
+#
+# See `/Users/prabhu/depscan-sea-plan.md` Phase 2 for the design.
+#
+# Structural choices copied from blint's now-green musl.yml (blint PR #201):
+# - Native-arch runners (ubuntu-24.04 / ubuntu-24.04-arm), NOT a job-level
+#   `container:`. JavaScript actions (checkout/upload/release) cannot run
+#   inside an Alpine container on arm64 runners, so those steps stay on the
+#   host and only the compile+PyInstaller+smoke step runs inside alpine:3.20.
+# - Files created in the container are owned by root; we chown them back to
+#   HOST_UID:HOST_GID before exit so the host upload/release can read them.
+# - Python venv at /opt/venv to avoid fighting Alpine's externally-managed
+#   system Python.
+#
+# nyxstone note: depscan's `--all-extras` pulls blint but NOT blint's
+# `extended` extra, so nyxstone never resolves. All of blint's musl nyxstone
+# machinery (LLVM 18 apk packages, NYXSTONE_LLVM_PREFIX, the PAGE_SIZE
+# source patch, --collect-all nyxstone / --hidden-import nyxstone_cpp) is
+# IRRELEVANT here and intentionally omitted. We assert nyxstone absence
+# explicitly. blint disassembly features that need nyxstone are unavailable
+# in this binary (expected; same as Windows).
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+      - feature/sea
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  Depscan-SEA-Musl-Build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
+            binary_name: depscan-linux-amd64-musl
+            cdxgen_asset: cdxgen-linux-amd64-musl
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            binary_name: depscan-linux-arm64-musl
+            cdxgen_asset: cdxgen-linux-arm64-musl
+    # `contents: write` is required only for `softprops/action-gh-release` to
+    # attach binaries to a tag release. No other elevated permissions.
+    permissions:
+      contents: write
+
+    env:
+      # Keep in sync with CDXGEN_IMAGE_VERSION in packages/xbom-lib/src/xbom_lib/cdxgen.py.
+      CDXGEN_SEA_VERSION: 'v12.8.0'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify version consistency
+        # Runs on the host (Ubuntu ships python3); the build itself runs
+        # inside alpine:3.20. See build/sea-hooks/verify_versions.py.
+        run: python3 build/sea-hooks/verify_versions.py
+
+      - name: Build, smoke test, and stage the depscan musl SEA binary
+        run: |
+          # The whole compile + PyInstaller + smoke runs inside alpine:3.20.
+          # Checkout/upload/release stay on the host because JavaScript
+          # actions cannot run inside an Alpine container on arm64.
+          docker run --rm \
+            -v "${{ github.workspace }}:/src" \
+            -w /src \
+            -e PYTHONIOENCODING=utf-8 \
+            -e LANG=en_US.utf-8 \
+            -e PYTHONUTF8=1 \
+            -e FORCE_COLOR=1 \
+            -e BINARY_NAME='${{ matrix.binary_name }}' \
+            -e CDXGEN_SEA_VERSION='${{ env.CDXGEN_SEA_VERSION }}' \
+            -e CDXGEN_ASSET='${{ matrix.cdxgen_asset }}' \
+            -e VDB_DATABASE_URL='ghcr.io/appthreat/vdbxz-app-2y:v6.7.x' \
+            -e SCAN_DEBUG_MODE=debug \
+            -e HOST_UID="$(id -u)" \
+            -e HOST_GID="$(id -g)" \
+            alpine:3.20 sh -euc '
+              set -e
+
+              echo "::group::apk add build toolchain"
+              # NOTE: blint additionally installs llvm18-dev llvm18-static
+              # clang18 here, but those exist ONLY to compile nyxstone, which
+              # depscan does not ship. They are intentionally omitted.
+              apk add --no-cache \
+                python3 python3-dev py3-pip \
+                build-base cmake make git \
+                musl-dev libffi-dev openssl-dev zlib-dev zstd-dev xz \
+                ncurses-dev libxml2-dev \
+                curl
+              echo "::endgroup::"
+
+              # Install uv as a standalone binary (downloads a musl-native
+              # build). We do NOT create a separate /opt/venv: PyInstaller
+              # must be installed into the SAME venv as depscan so it can see
+              # apsw/lief/pydantic_core/analysis_lib etc. uv sync creates
+              # /src/.venv and uv pip install pyinstaller lands there too.
+              curl -LsSf https://astral.sh/uv/install.sh | sh
+              export PATH="$HOME/.local/bin:$PATH"
+              # uv needs a Python to drive. uv maintains musl builds of
+              # CPython via python-build-standalone, so this works on Alpine.
+              uv python install 3.14
+
+              cd /src
+              echo "::group::uv sync --all-extras --all-packages"
+              # Sync the entire uv workspace (depscan + ds-*-lib members)
+              # with all extras. depscan has no nyxstone extra, so this is
+              # safe even though blint is pulled in via the `ext`/`all` extras.
+              uv sync --all-extras --all-packages
+              # Install PyInstaller INTO /src/.venv so its module discovery
+              # sees every workspace member and native dep.
+              uv pip install "pyinstaller>=6.20.0"
+              echo "::endgroup::"
+
+              echo "::group::assert nyxstone absent"
+              # nyxstone has no musl wheels and must never ship here.
+              if uv pip list 2>/dev/null | grep -i "^nyxstone"; then
+                echo "::error::nyxstone was pulled into the venv. It must not ship in the musl SEA binary."
+                exit 1
+              fi
+              if uv run python -c "import nyxstone" 2>/dev/null; then
+                echo "::error::import nyxstone unexpectedly succeeded."
+                exit 1
+              fi
+              echo "Confirmed: nyxstone absent from the venv. blint disassembly features that require it will be unavailable in the musl binary (expected)."
+              echo "::endgroup::"
+
+              echo "::group::stage and verify cdxgen SEA binary"
+              mkdir -p build/local_bin
+              base="https://github.com/cdxgen/cdxgen/releases/download/${CDXGEN_SEA_VERSION}"
+              echo "Downloading ${CDXGEN_ASSET} from ${base}"
+              curl -fL "${base}/${CDXGEN_ASSET}" -o build/local_bin/cdxgen
+              curl -fL "${base}/${CDXGEN_ASSET}.sha256" -o build/local_bin/cdxgen.sha256
+              expected="$(awk "{print \$1}" build/local_bin/cdxgen.sha256)"
+              actual="$(sha256sum build/local_bin/cdxgen | awk "{print \$1}")"
+              if [ "${expected}" != "${actual}" ]; then
+                echo "::error::cdxgen sha256 mismatch: expected ${expected}, got ${actual}"
+                exit 1
+              fi
+              echo "cdxgen sha256 verified: ${actual}"
+              chmod +x build/local_bin/cdxgen
+              # Confirm the staged cdxgen SEA runs natively before bundling.
+              build/local_bin/cdxgen --version
+              ls -la build/local_bin/
+              echo "::endgroup::"
+
+              echo "::group::PyInstaller --onefile build"
+              uv run pyinstaller depscan/cli.py \
+                --noconfirm --log-level=WARN --nowindow --onefile \
+                --name "${BINARY_NAME}" \
+                --add-data="vendor:vendor" \
+                --add-data="packages/analysis-lib/src/analysis_lib/vex/data:analysis_lib/vex/data" \
+                --add-binary="build/local_bin/cdxgen:local_bin" \
+                --collect-submodules depscan \
+                --collect-submodules xbom_lib \
+                --collect-all analysis_lib \
+                --collect-data reporting_lib \
+                --collect-submodules server_lib \
+                --collect-all apsw \
+                --collect-all lief \
+                --collect-submodules oras \
+                --hidden-import=apsw \
+                --hidden-import=pydantic_core \
+                --hidden-import=rpds \
+                --hidden-import=_cffi_backend \
+                --noupx
+              ls -la dist/
+              echo "::endgroup::"
+
+              echo "::group::smoke test --version"
+              ./dist/"${BINARY_NAME}" --version
+              ./dist/"${BINARY_NAME}" --help | head -5
+              echo "::endgroup::"
+
+              # The binary is musl-linked; it must be smoke-tested inside
+              # the alpine container (cannot run on the ubuntu host).
+              echo "::group::smoke test real scan via bundled cdxgen"
+              if command -v cdxgen >/dev/null 2>&1; then
+                echo "::error::cdxgen found on PATH at $(command -v cdxgen); smoke test would not exercise the bundled binary"
+                exit 1
+              fi
+              echo "Confirmed: no cdxgen on PATH. The frozen binary must use local_bin/cdxgen."
+              rm -rf /tmp/sea-fixture /tmp/sea-reports
+              mkdir -p /tmp/sea-fixture /tmp/sea-reports
+              printf "requests==2.32.0\n" > /tmp/sea-fixture/requirements.txt
+
+              ./dist/"${BINARY_NAME}" \
+                --src /tmp/sea-fixture \
+                -o /tmp/sea-reports \
+                --csaf \
+                --no-banner
+
+              echo "--- reports dir ---"
+              ls -la /tmp/sea-reports/
+
+              found_bom=0
+              for f in /tmp/sea-reports/*bom*.json /tmp/sea-reports/*.vdr.json; do
+                [ -e "$f" ] && { found_bom=1; break; }
+              done
+              if [ "${found_bom}" -ne 1 ]; then
+                echo "::error::No BOM/VDR file produced; bundled cdxgen likely did not run."
+                exit 1
+              fi
+              if ! ls /tmp/sea-reports/*.csaf.json >/dev/null 2>&1; then
+                echo "::error::No CSAF VEX document produced; VEX schema data not bundled."
+                exit 1
+              fi
+              if ! ls /tmp/sea-reports/*.html >/dev/null 2>&1; then
+                echo "::error::No HTML report produced; reporting_lib templates not bundled."
+                exit 1
+              fi
+              echo "Smoke test passed: BOM/VDR, CSAF VEX and HTML report all produced."
+              echo "::endgroup::"
+
+              echo "::group::sha256"
+              cd dist
+              sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
+              cat "${BINARY_NAME}.sha256"
+              cd /src
+              echo "::endgroup::"
+
+              # Files are created as root in the container; hand them back to
+              # the host runner user so the upload/release steps can read them.
+              chown -R "${HOST_UID}:${HOST_GID}" dist build *.spec 2>/dev/null || true
+            '
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ matrix.binary_name }}
+          path: |
+            dist/${{ matrix.binary_name }}
+            dist/${{ matrix.binary_name }}.sha256
+          if-no-files-found: error
+
+      - name: Attach binaries to release on tag
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/${{ matrix.binary_name }}
+            dist/${{ matrix.binary_name }}.sha256

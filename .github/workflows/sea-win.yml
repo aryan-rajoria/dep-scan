@@ -1,0 +1,267 @@
+name: Build Windows SEA Binary
+
+# Builds a single-file PyInstaller `--onefile` binary of depscan for Windows
+# (amd64) with the matching cdxgen SEA binary (`cdxgen-windows-amd64.exe`)
+# bundled under `local_bin/`. The frozen binary therefore produces a CycloneDX
+# BOM + VDR out of the box without requiring Node.js or an `npm install cdxgen`.
+#
+# See `/Users/prabhu/depscan-sea-plan.md` Phase 3 for the design.
+#
+# nyxstone note: nyxstone (a blint `extended`-group dependency, sdist-only,
+# needs LLVM 18) has no Windows support and must never be in this build.
+# depscan's `--all-extras` pulls blint but NOT blint's `extended` extra, so
+# nyxstone should not resolve. We assert that explicitly below. blint's
+# disassembly features that need nyxstone are simply unavailable on the
+# Windows binary — that is expected and documented in the README.
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+      - feature/sea
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  Depscan-SEA-Windows-Build:
+    runs-on: windows-latest
+    # `contents: write` is required only for `softprops/action-gh-release` to
+    # attach binaries to a tag release. No other elevated permissions are
+    # needed for this workflow.
+    permissions:
+      contents: write
+
+    env:
+      # Pin to a stable Python for widest native-wheel coverage of apsw /
+      # lief / pydantic_core / rpds / cryptography. Matches blint's binaries.
+      PYTHON_VERSION: '3.14'
+      # Keep the bundled cdxgen SEA version in sync with
+      # CDXGEN_IMAGE_VERSION in packages/xbom-lib/src/xbom_lib/cdxgen.py.
+      CDXGEN_SEA_VERSION: 'v12.8.0'
+      BINARY_NAME: depscan-windows-amd64
+      FORCE_COLOR: '1'
+      PYTHONUTF8: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify version consistency
+        # Fail fast before spending build minutes: assert pyproject.toml,
+        # build/assets/*, optional git tag, and CDXGEN_SEA_VERSION vs
+        # CDXGEN_IMAGE_VERSION all agree. See build/sea-hooks/verify_versions.py.
+        env:
+          CDXGEN_SEA_VERSION: ${{ env.CDXGEN_SEA_VERSION }}
+        run: python3 build/sea-hooks/verify_versions.py
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install project and PyInstaller
+        shell: pwsh
+        run: |
+          uv python install ${{ env.PYTHON_VERSION }}
+          # Sync the entire uv workspace (depscan + ds-*-lib members) with
+          # all extras. depscan's extras are dev/server/ext/all; NONE of
+          # them pulls nyxstone (that's only in blint's `extended` extra).
+          uv sync --all-extras --all-packages
+          uv pip install "pyinstaller>=6.20.0"
+
+      - name: Assert nyxstone is NOT installed (Windows unsupported)
+        shell: pwsh
+        run: |
+          # Fail fast if anything pulled nyxstone into the venv. We must
+          # never bundle it on Windows: it is sdist-only, needs LLVM 18 at
+          # build time, and has no Windows support.
+          $nyxstone = uv pip list 2>$null | Select-String -Pattern '^nyxstone' -SimpleMatch
+          # Reset $LASTEXITCODE so a nonzero uv exit doesn't fail the step
+          # prematurely; the next conditional decides whether to fail.
+          $LASTEXITCODE = 0
+          if ($nyxstone) {
+            Write-Error "::error::nyxstone was pulled into the venv ($nyxstone). It must not ship in the Windows SEA binary."
+            exit 1
+          }
+          # Also exercise the import path that blint would use. We EXPECT
+          # this to fail (nonzero exit) because nyxstone is absent; that
+          # nonzero must NOT leak into the step's exit code.
+          uv run python -c "import nyxstone" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Error "::error::'import nyxstone' unexpectedly succeeded."
+            exit 1
+          }
+          # Reset so the step exits cleanly.
+          $LASTEXITCODE = 0
+          Write-Host "Confirmed: nyxstone is absent from the venv. blint disassembly features that require it will be unavailable in the Windows binary (expected)."
+
+      - name: Download, verify and stage the cdxgen SEA binary
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path build/local_bin | Out-Null
+          $base = "https://github.com/cdxgen/cdxgen/releases/download/${env:CDXGEN_SEA_VERSION}"
+          $asset = "cdxgen-windows-amd64.exe"
+          Write-Host "Downloading $asset from $base"
+          Invoke-WebRequest -UseBasicParsing -Uri "$base/$asset" -OutFile "build/local_bin/cdxgen.exe"
+          Invoke-WebRequest -UseBasicParsing -Uri "$base/$asset.sha256" -OutFile "build/local_bin/cdxgen.exe.sha256"
+          # cdxgen .sha256 files are formatted as "<hex>  <name>". Extract
+          # the hex from the first whitespace-separated field and compare
+          # case-insensitively (Get-FileHash emits uppercase).
+          $expected = ((Get-Content "build/local_bin/cdxgen.exe.sha256" -Raw) -split '\s+')[0].ToLower()
+          $actual = (Get-FileHash -Algorithm SHA256 "build/local_bin/cdxgen.exe").Hash.ToLower()
+          if ($expected -ne $actual) {
+            Write-Error "::error::cdxgen sha256 mismatch: expected $expected, got $actual"
+            exit 1
+          }
+          Write-Host "cdxgen sha256 verified: $actual"
+          # Confirm the staged cdxgen SEA runs natively before we bundle it.
+          # This also validates that cmd.exe (the shell used by exec_tool()
+          # on Windows via shell=True) can launch it.
+          & cmd /c "build\local_bin\cdxgen.exe --version"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "::error::cdxgen.exe --version failed via cmd /c"
+            exit 1
+          }
+          Get-ChildItem -Recurse build/local_bin | Format-Table Name,Length,Mode
+
+      - name: Build the depscan SEA binary (PyInstaller --onefile)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Windows path separator is `;` in PyInstaller --add-data/--add-binary.
+          # `-i` and `--version-file` come from the reusable assets under
+          # build/assets/. `--disable-windowed-traceback` matches blint's
+          # Windows invocation and keeps crash tracebacks out of GUI dialogs.
+          uv run pyinstaller depscan/cli.py `
+            --noconfirm --log-level=WARN --nowindow --onefile `
+            --name $env:BINARY_NAME `
+            --add-data="vendor;vendor" `
+            --add-data="packages/analysis-lib/src/analysis_lib/vex/data;analysis_lib/vex/data" `
+            --add-binary="build/local_bin/cdxgen.exe;local_bin" `
+            --collect-submodules depscan `
+            --collect-submodules xbom_lib `
+            --collect-all analysis_lib `
+            --collect-data reporting_lib `
+            --collect-submodules server_lib `
+            --collect-all apsw `
+            --collect-all lief `
+            --collect-submodules oras `
+            --hidden-import=apsw `
+            --hidden-import=pydantic_core `
+            --hidden-import=rpds `
+            --hidden-import=_cffi_backend `
+            -i build/assets/depscan.ico `
+            --version-file=build/assets/file_version_info.txt `
+            --disable-windowed-traceback `
+            --noupx
+          Get-ChildItem dist | Format-Table Name,Length,Mode
+
+      - name: Smoke test - --version and --help
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Host "::group::depscan --version"
+          & "dist\$env:BINARY_NAME.exe" --version
+          Write-Host "::endgroup::"
+          Write-Host "::group::depscan --help (first 10 lines)"
+          & "dist\$env:BINARY_NAME.exe" --help | Select-Object -First 10
+          Write-Host "::endgroup::"
+
+      - name: Smoke test - real scan using the BUNDLED cdxgen
+        shell: pwsh
+        env:
+          # Use the smaller 2-year app-only vuln DB image so the smoke test
+          # doesn't pull the full (default) database.
+          VDB_DATABASE_URL: "ghcr.io/appthreat/vdbxz-app-2y:v6.7.x"
+          SCAN_DEBUG_MODE: debug
+          # Deliberately leave CDXGEN_CMD unset and assert cdxgen is NOT on
+          # PATH so we know find_cdxgen_cmd() falls back to local_bin/cdxgen.exe
+          # extracted from _MEIPASS. We also exercise the shell=True path in
+          # exec_tool() which launches the bundled cdxgen.exe via cmd.exe.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cdxgenOnPath = Get-Command cdxgen -ErrorAction SilentlyContinue
+          if ($cdxgenOnPath) {
+            Write-Error "::error::cdxgen found on PATH at $($cdxgenOnPath.Source); smoke test would not exercise the bundled binary"
+            exit 1
+          }
+          Write-Host "Confirmed: no cdxgen on PATH. The frozen binary must use local_bin/cdxgen.exe."
+
+          # Create a small Python fixture for cdxgen to discover.
+          Remove-Item -Recurse -Force C:\sea\fixture, C:\sea\reports -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path C:\sea\fixture, C:\sea\reports | Out-Null
+          Set-Content -Path C:\sea\fixture\requirements.txt -Value "requests==2.32.0"
+
+          # Run a real scan. --csaf exercises CSAF VEX schema loading
+          # (analysis_lib.vex.data), the HTML report exercises reporting_lib
+          # templates, and license scanning touches vendor/.
+          & "dist\$env:BINARY_NAME.exe" `
+            --src C:\sea\fixture `
+            -o C:\sea\reports `
+            --csaf `
+            --no-banner
+
+          Write-Host "::group::reports dir"
+          Get-ChildItem C:\sea\reports | Format-Table Name,Length
+          Write-Host "::endgroup::"
+
+          # BOM + VDR must be produced via the bundled cdxgen.
+          $bom = Get-ChildItem C:\sea\reports -Filter '*bom*.json' -ErrorAction SilentlyContinue
+          $vdr = Get-ChildItem C:\sea\reports -Filter '*.vdr.json' -ErrorAction SilentlyContinue
+          if (-not $bom -and -not $vdr) {
+            Write-Error "::error::No BOM/VDR file produced; bundled cdxgen.exe likely did not run."
+            exit 1
+          }
+
+          # CSAF VEX output exercises the bundled CSAF + CVSS schemas.
+          $csaf = Get-ChildItem C:\sea\reports -Filter '*.csaf.json' -ErrorAction SilentlyContinue
+          if (-not $csaf) {
+            Write-Error "::error::No CSAF VEX document produced; VEX schema data not bundled."
+            exit 1
+          }
+
+          # HTML report exercises reporting_lib templates.
+          $html = Get-ChildItem C:\sea\reports -Filter '*.html' -ErrorAction SilentlyContinue
+          if (-not $html) {
+            Write-Error "::error::No HTML report produced; reporting_lib templates not bundled."
+            exit 1
+          }
+
+          Write-Host "Smoke test passed: BOM/VDR, CSAF VEX and HTML report all produced."
+
+      - name: Generate .sha256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Push-Location dist
+          $hash = (Get-FileHash -Algorithm SHA256 "$env:BINARY_NAME.exe").Hash.ToLower()
+          "$hash  $env:BINARY_NAME.exe" | Out-File -NoNewline -Encoding ascii "$env:BINARY_NAME.exe.sha256"
+          Write-Host "::group::sha256"
+          Get-Content "$env:BINARY_NAME.exe.sha256"
+          Write-Host "::endgroup::"
+          Pop-Location
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ env.BINARY_NAME }}
+          path: |
+            dist/${{ env.BINARY_NAME }}.exe
+            dist/${{ env.BINARY_NAME }}.exe.sha256
+          if-no-files-found: error
+
+      - name: Attach binaries to release on tag
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/${{ env.BINARY_NAME }}.exe
+            dist/${{ env.BINARY_NAME }}.exe.sha256

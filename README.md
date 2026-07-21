@@ -196,6 +196,39 @@ options:
   -v, --version         Display the version
 ```
 
+### Standalone binaries (no Python or Node.js required)
+
+Pre-built single-file executables are attached to each [GitHub release](https://github.com/owasp-dep-scan/dep-scan/releases). They bundle a matching [cdxgen](https://github.com/cdxgen/cdxgen) SEA binary, so BOM generation works out of the box without installing Python, Node.js, or cdxgen.
+
+| Platform | Architecture | Asset |
+| --- | --- | --- |
+| Linux (glibc) | x86_64 | `depscan-linux-amd64` |
+| Linux (glibc) | arm64 | `depscan-linux-arm64` |
+| Linux (musl / Alpine) | x86_64 | `depscan-linux-amd64-musl` |
+| Linux (musl / Alpine) | arm64 | `depscan-linux-arm64-musl` |
+| macOS | Apple silicon | `depscan-darwin-arm64` |
+| macOS | Intel | `depscan-darwin-amd64` |
+| Windows | x86_64 | `depscan-windows-amd64.exe` |
+
+Each asset has a matching `.sha256` file for verification.
+
+```bash
+# Example: Linux x86_64
+curl -LO https://github.com/owasp-dep-scan/dep-scan/releases/latest/download/depscan-linux-amd64
+curl -LO https://github.com/owasp-dep-scan/dep-scan/releases/latest/download/depscan-linux-amd64.sha256
+sha256sum -c depscan-linux-amd64.sha256
+chmod +x depscan-linux-amd64
+./depscan-linux-amd64 --src $PWD --reports-dir $PWD/reports
+```
+
+> [!NOTE]
+> The macOS binaries are currently unsigned. On first run macOS Gatekeeper may block them; clear the quarantine attribute with `xattr -d com.apple.quarantine ./depscan-darwin-arm64` (or allow the binary under System Settings → Privacy & Security).
+
+> [!NOTE]
+> The vulnerability database is still downloaded on first run — only cdxgen is bundled, not the vuln DB. Set `VDB_DATABASE_URL` (for example `ghcr.io/appthreat/vdbxz-app-2y:v6.7.x` for a smaller, recent-years-only database) to control which database is fetched.
+
+All standalone binaries bundle `blint`, but not its optional `nyxstone` disassembly backend (which has no wheels and no Windows support). Deep disassembly-based binary analysis is therefore unavailable in the standalone binaries; use the Python package (`pip install owasp-depscan[all]`) if you need it.
+
 ### Scanning containers locally (Python version)
 
 Scan a Java project.
