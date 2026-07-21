@@ -45,7 +45,9 @@ jobs:
         npm install -g @cyclonedx/cdxgen
     - name: Test with pytest
       run: |
-        uv run pytest --cov=depscan test
+        # Run the top-level depscan tests and the analysis-lib tests (the
+        # latter includes the CSAF VEX generate-and-validate suite).
+        uv run pytest --cov=depscan test packages/analysis-lib/tests
         uv run depscan --config .config/depscan-dev.toml
       env:
         SCAN_DEBUG_MODE: debug

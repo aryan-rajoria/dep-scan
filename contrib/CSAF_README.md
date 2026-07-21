@@ -1,105 +1,96 @@
 ## Purpose
 
-Generate CSAF documents populated with vulnerability results from OWASP
-dep-scan.
+Generate [CSAF VEX](https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html)
+documents populated with vulnerability results and reachability analysis from
+OWASP dep-scan.
 
 ### How-to
 
-1. Run depscan with the --csaf option.
+1. Run depscan with the `--csaf` option:
 
+   ```bash
+   depscan --bom reports/sbom-build.cdx.json --reports-dir reports --src . --csaf
+   ```
 
-2. Depscan will check if you already have a csaf.toml file in the target
-   directory before proceeding.
+2. dep-scan writes a CSAF VEX document named `<base>.csaf.json` (e.g.
+   `sbom-build.csaf.json`) into the reports directory. The VDR/BOM file is
+   **never** modified.
 
+3. If no `csaf.toml` exists in the target directory, dep-scan writes a starter
+   template and **continues** with sensible defaults -- you do not need to run
+   the command twice. Edit the toml to customize publisher/tracking metadata
+   and rerun to pick up your changes.
 
-3. If you do not, the template will be generated and you will be requested
-   to fill it out before running depscan again.
-   > Note: You may also just run depscan again without altering the csaf.toml -
-   > this means your document will have dummy publisher data.
-4. To produce a valid CSAF document, a number of fields must be included in
-   the toml. Some you may choose to set yourself, or we will set them for you.
-   Please see the official
-   [CSAF 2.0](https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html)
-   standard for a full explanation of requirements. A copy of the schema is
-   available [here](csaf_2.0_schema.json). See
-   [Requirements](#requirements) for a brief overview.
+### Output naming and the VDR safety guarantee
 
+The output filename is derived from the BOM base name with the `.csaf.json`
+suffix (for `sbom-js-build.cdx.json` you get `sbom-js-build.csaf.json`). The
+emit layer asserts the output path always ends in `.csaf.json` and never
+equals the BOM/VDR path, so the CSAF export cannot overwrite the VDR (a
+regression that existed in v6).
 
-5. Run depscan with the --csaf option again.
+### Reachability -> VEX status
 
+When reachability artifacts (e.g. `blint`/`atom` slices) are available,
+dep-scan folds them into the VEX assessment:
 
-6. This time, a CSAF document will be written to the reports directory that
-   you specified using the --reports-dir option (default behavior creates a
-   reports directory in your current directory).
+| Reachability | CSAF `product_status`           | Flag / justification                              |
+|--------------|---------------------------------|---------------------------------------------------|
+| Reachable    | `known_affected`                | -                                                 |
+| Unreachable  | `known_not_affected`            | `component_not_present` / `vulnerable_code_not_in_execute_path` |
+| Unknown      | `under_investigation`           | -                                                 |
+
+This is the whole point of a dep-scan VEX: vulnerabilities in dependencies
+whose code is not on an executed path are marked `known_not_affected` with a
+machine-readable justification, not merely "a fixed version exists".
+
+### Schema validation
+
+Every generated document is validated in-process against the official CSAF
+2.0 (or 2.1) JSON schema bundled with the `analysis_lib.vex` package. Any
+validation errors are logged with the document still written for debugging.
+
+`--csaf-version {2.0,2.1}` selects the target schema (default `2.1`). Note
+that CSAF 2.0 has no `cvss_v4` slot, so CVSS v4 vectors are retained only
+when targeting 2.1; CVSS v2/v3 are always mapped. Validation resolves the
+FIRST CVSS schemas from bundled copies, so it runs fully offline.
 
 ### The csaf.toml
 
-The first time you run depscan with the --csaf option against a specific
-directory, a csaf.toml template will be placed in your target directory and you
-will be requested to fill it out before running depscan again. This is a
-configuration file used to set metadata fields outside the vulnerabilities
-section.
+The optional `csaf.toml` sets metadata outside the vulnerabilities section.
+Required fields are in **bold**.
 
-#### Requirements
+| TOML Field    | Subcategories                                                       | Comments                                                                                          |
+|---------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| **document**  | **category**<br>**title**                                           | default category is `csaf_vex`.                                                                   |
+| **publisher** | **category**<br>**name**<br>**namespace**<br>contact_details        | valid categories: coordinator, discoverer, other, translator, user, vendor.                       |
+| note          | **category**<br>**text**<br>audience<br>title                       | notes without `text` are dropped (CSAF requires non-empty note text).                             |
+| reference     | **summary**<br>**url**<br>category                                  | valid categories: self, external.                                                                 |
+| **tracking**  | **status**<br>**version**<br>id<br>current_release_date<br>initial_release_date | dates default to now; version defaults to the latest revision number.                  |
+| tracking.revision_history | date<br>number<br>summary                                 | the document always carries at least one revision entry (CSAF requires a non-empty array).        |
 
-In order to produce a valid CSAF document, certain sections are required. An
-overview is below, with required components in bold.
+The `product_tree` is built automatically from the CycloneDX BOM components
+(every component's purl becomes its `product_id`), so no manual product-tree
+import is needed.
 
-> Where a top level category, such as note is not bolded, but one of its
-> members is, that indicates the bolded are only required if the parent category
-> is included, e.g. a note entry must include category and text, but a valid
-> CSAF does not require that any notes be included.:
+#### A few notes on tracking
 
-| TOML Field                | Subcategories                                                                                   | Comments                                                                                                                                                                                                                                                                                                                                  |
-|---------------------------|-------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **document**              | **category<br>title**                                                                           | default category is csaf*vex<br>category must match regex: `^[^\s\-*\.](.\*[^\s\-_\.])?$`                                                                                                                                                                                                                                                 |
-| **publisher**             | **name**<br>**category**<br>**namespace**<br>contact_details                                    | <br>valid categories: coordinator, discoverer, other, translator, user, vendor<br><br>e.g. an email address                                                                                                                                                                                                                               |
-| note                      | **category**<br>**text**<br>audience<br>title                                                   | valid categories: description, details, faq, general, legal_disclaimer, other, summary<br><br>multiple note entries may be included under additional [note] headings                                                                                                                                                                      |
-| reference                 | **summary**<br>**url**<br>category                                                              | multiple reference entries may be included under additional [reference] headings<br><br>valid categories: self, external                                                                                                                                                                                                                  |
-| distribution              | text<br>tlp.**label**<br>tlp.url                                                                | If tlp is included, label is required<br>valid labels: AMBER, GREEN, RED, WHITE                                                                                                                                                                                                                                                           |
-| product_tree              | easy_import                                                                                     | We support importing a product tree from a json file, the path of which should be specified here. If you do not provide this data, we will instead try to import the root component identified by the cdxgen sbom. If neither of these attempts succeeds, the product_tree will be omitted. <br>[example](../test/data/product_tree.json) |
-| **tracking**              | **current_release_date**<br/>**initial_release_date**<br/>**version**<br/>**status**<br/>**id** | Please use ISO date formats if entering dates yourself.<br/><br/>valid statuses: draft, final, interim<br/>We will generate an id consisting of date and version if you do not include this, but id is best set by you                                                                                                                    |
-| tracking.revision_history | date<br/>number<br/>summary                                                                     | Leave this section alone. Depscan will add revision entries per final version ([see notes on tracking](#a-few-notes-on-tracking)).                                                                                                                                                                                                        |
-| depscan_version           |                                                                                                 | This field is automatically updated for our use to provide backward compatibility if the TOML options change                                                                                                                                                                                                                              |
-
-> Feel free to preserve all fields on the toml if you may want them later.
-> Entries without content will be omitted.
-
-#### A Few Notes on Tracking
-
-Although tracking and all of its components are required, if you do not
-include them, we will use the current date/time and update the version as
-appropriate.
-
-Currently we only handle versioning for documents with a status of final.
-This means your document may fail validation if you have not yet generated
-an initial final version - because we only add a revision history entry
-for final versions. Here's
-what [OASIS](https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html#321126-document-property---tracking---revision-history)
-has to say on the matter:
-> Each Revision item which has a number of 0 or 0.y.z MUST be removed from
-> the document if the document status is final. Versions of the document
-> which are pre-release SHALL NOT have its own revision item. All changes
-> MUST be tracked in the item for the next release version. Build metadata
-> SHOULD NOT be included in the number of any revision item.
+`tracking.revision_history` is **always** non-empty: CSAF requires at least
+one revision entry even for `draft` documents. The document `version` equals
+the latest revision number. If you leave dates blank, dep-scan uses the
+current UTC time.
 
 ### Validation
 
-Coming soon! For now, you can validate your generated CSAFs using a [JSON
-schema validator](https://www.jsonschemavalidator.net/) and the [csaf 2.0
-schema](csaf_2.0_schema.json).
+Validation runs automatically during generation. To validate a document
+manually:
 
-If you're looking for a cli with this functionality, I've found
-[check-jsonschema](https://pypi.org/project/check-jsonschema/) easy to use.
-
-`pip install check-jsonschema`
-
-`python check-jsonschema --schemafile contrib/csaf_2.0_schema.json
-path_to_your_csaf_file`
+```bash
+pip install check-jsonschema
+check-jsonschema --schemafile contrib/csaf_2.0_schema.json path/to/your.csaf.json
+```
 
 ### Questions? Comments? Suggestions?
 
 Feel free to reach out to us on [discord](https://discord.gg/DCNxzaeUpd) or
-start a discussion tagging
-[@cerrussell](https://github.com/cerrussell) on
-the [OWASP dep-scan Repo](https://github.com/owasp-dep-scan/dep-scan).
+start a discussion on the [OWASP dep-scan repo](https://github.com/owasp-dep-scan/dep-scan).

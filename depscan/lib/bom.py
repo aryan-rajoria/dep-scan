@@ -14,6 +14,7 @@ from xbom_lib.cdxgen import (
     CdxgenImageBasedGenerator,
     CdxgenServerGenerator,
 )
+from depscan.cli_options import DEFAULT_SPEC_VERSION
 from depscan.lib.logger import LOG, SPINNER, console
 from depscan.lib.utils import cleanup_license_string
 from typing import Dict, Optional
@@ -399,28 +400,59 @@ def create_lifecycle_boms(cdxgen_lib, src_dir, options):
     return any_success
 
 
-def create_empty_vdr(pkg_list, ds_version):
+def _spec_version_sort_key(spec_version):
+    """Sort key for a CycloneDX specVersion string like ``1.6`` / ``2.0``."""
+    major, _, minor = str(spec_version or "").partition(".")
+    try:
+        return (int(major), int(minor or 0))
+    except ValueError:
+        return (0, 0)
+
+
+def determine_spec_version(bom_files=None, fallback=None):
+    """Determine the CycloneDX specVersion to use for a from-scratch VDR.
+
+    Prefers the **highest** specVersion found across the given SBOMs (so a
+    lifecycle analysis that mixes, say, a 1.6 and a 1.7 BOM emits the VDR at
+    1.7 and never downgrades component data). Falls back to the user-supplied
+    ``fallback`` (the ``--spec-version`` value) and finally the default.
+    """
+    versions = []
+    for bom_file in bom_files or []:
+        data = json_load(bom_file, log=LOG) or {}
+        if spec := data.get("specVersion"):
+            versions.append(str(spec))
+    if versions:
+        return max(versions, key=_spec_version_sort_key)
+    return fallback or DEFAULT_SPEC_VERSION
+
+
+def create_empty_vdr(pkg_list, ds_version, spec_version=None):
     components = pkg_list or []
-    bom_data = update_tools_metadata(None, None, ds_version)
+    bom_data = update_tools_metadata(None, None, ds_version, spec_version=spec_version)
     return {**bom_data, "components": components}
 
 
-def update_tools_metadata(tools, bom_data, ds_version):
+def update_tools_metadata(tools, bom_data, ds_version, spec_version=None):
     """
     Helper function to add depscan information as metadata
     :param tools: Tools section of the SBOM
     :param bom_data: SBOM data
     :param ds_version: depscan version
+    :param spec_version: CycloneDX specVersion for a from-scratch VDR (user
+        ``--spec-version`` input or the max across the source SBOMs). Only used
+        when ``bom_data`` is empty; an existing BOM keeps its own specVersion.
     :return: None
     """
     if not bom_data:
         now_utc = datetime.now(timezone.utc)
         bom_data = {
             "bomFormat": "CycloneDX",
-            # Default spec for from-scratch VDRs (no source BOM). When a source
-            # BOM exists, export_bom preserves its specVersion verbatim so a
-            # 1.7 BOM from cdxgen 12.8 stays 1.7 (never downgraded).
-            "specVersion": "1.6",
+            # Spec for from-scratch VDRs (no source BOM). Driven by the user's
+            # --spec-version or the max spec across source SBOMs, defaulting to
+            # DEFAULT_SPEC_VERSION. When a source BOM exists, export_bom
+            # preserves its specVersion verbatim (never downgraded).
+            "specVersion": spec_version or DEFAULT_SPEC_VERSION,
             "serialNumber": f"urn:uuid:{uuid.uuid4()}",
             "version": 1,
             "metadata": {

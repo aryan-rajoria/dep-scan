@@ -8,7 +8,7 @@ import time
 from typing import List
 
 from analysis_lib import ReachabilityAnalysisKV, VdrAnalysisKV, get_all_bom_files
-from analysis_lib.csaf import export_csaf, write_toml
+from analysis_lib.vex.emit import export_csaf
 from analysis_lib.output import licenses_risk_table, pkg_risks_table, summary_stats
 from analysis_lib.reachability import get_reachability_impl
 from analysis_lib.search import get_pkgs_by_scope
@@ -27,7 +27,14 @@ from depscan import get_version
 from depscan.cli_options import build_parser
 from depscan.lib import explainer, utils
 from depscan.lib.audit import risk_audit, risk_audit_map
-from depscan.lib.bom import annotate_vdr, create_bom, create_empty_vdr, export_bom, get_pkg_by_type
+from depscan.lib.bom import (
+    annotate_vdr,
+    create_bom,
+    create_empty_vdr,
+    determine_spec_version,
+    export_bom,
+    get_pkg_by_type,
+)
 from depscan.lib.config import (
     DEPSCAN_DEFAULT_VDR_FILE,
     UNIVERSAL_SCAN_TYPE,
@@ -159,6 +166,7 @@ def vdr_analyze_summarize(
     no_vuln_table=False,
     fuzzy_search=False,
     search_order=None,
+    spec_version=None,
 ):
     """
     Method to perform VDR analysis followed by summarization.
@@ -230,9 +238,16 @@ def vdr_analyze_summarize(
             # Case 1: Single BOM file resulting in a single VDR file
             if bom_file:
                 cdx_vdr_data = json_load(bom_file, log=LOG)
-            # Case 2: Multiple BOM files in a bom directory
+            # Case 2: Multiple BOM files in a bom directory (e.g. lifecycle
+            # analysis). Use the max specVersion across those SBOMs, falling
+            # back to the user's --spec-version and then the default.
             elif bom_dir:
-                cdx_vdr_data = create_empty_vdr(pkg_list, ds_version)
+                lifecycle_spec_version = determine_spec_version(
+                    get_all_bom_files(bom_dir), fallback=spec_version
+                )
+                cdx_vdr_data = create_empty_vdr(
+                    pkg_list, ds_version, spec_version=lifecycle_spec_version
+                )
         if cdx_vdr_data:
             export_bom(cdx_vdr_data, ds_version, pkg_vulnerabilities, vdr_file)
             LOG.debug(f"The VDR file '{vdr_file}' was created successfully.")
@@ -424,23 +439,6 @@ def run_depscan(args):
     # Apply read-only SQLite tuning for the scan (T2). Done after the download
     # so the vdb update path is never opened immutable.
     configure_vdb_readonly()
-    if args.csaf:
-        toml_file_path = os.getenv("DEPSCAN_CSAF_TEMPLATE", os.path.join(src_dir, "csaf.toml"))
-        if not os.path.exists(toml_file_path):
-            LOG.info("CSAF toml not found, creating template in %s", src_dir)
-            write_toml(toml_file_path)
-            LOG.info("Please fill out the toml with your details and rerun depscan.")
-            LOG.info(
-                "Check out our CSAF documentation for an explanation of "
-                "this feature. https://github.com/owasp-dep-scan/dep-scan"
-                "/blob/master/contrib/CSAF_README.md"
-            )
-            LOG.info(
-                "If you're just checking out how our generator works, "
-                "feel free to skip filling out the toml and just rerun "
-                "depscan."
-            )
-            sys.exit(0)
     pkg_list, project_types_list = set_project_types(args, src_dir)
     if args.custom_data:
         LOG.info(f"Loading custom vulnerability data from {args.custom_data}")
@@ -483,10 +481,17 @@ def run_depscan(args):
     if not config_file_mode:
         run_config = {**depscan_options}
         del run_config["no_banner"]
-        write_toml(run_config_file, run_config, write_version=False)
-        LOG.debug(
-            f"Created a sample depscan config file at '{run_config_file}', based on this run."
-        )
+        try:
+            import toml as _toml
+
+            with open(run_config_file, "w") as _fh:
+                _fh.write(_toml.dumps(run_config))
+        except OSError as exc:
+            LOG.debug("Could not write sample config to %s: %s", run_config_file, exc)
+        else:
+            LOG.debug(
+                f"Created a sample depscan config file at '{run_config_file}', based on this run."
+            )
     # We have everything needed to start the composition analysis. There are many approaches to implementing an SCA tool.
     # Our style of analysis is comparable to that of an intelligent Hubble telescope or a rover—examining the same subject through multiple optics, colors, and depths to gain a deeper understanding.
     # We begin by iterating over the project types provided or assumed.
@@ -723,6 +728,7 @@ def run_depscan(args):
             no_vuln_table=args.no_vuln_table,
             fuzzy_search=depscan_options.get("fuzzy_search", False),
             search_order=depscan_options.get("search_order"),
+            spec_version=depscan_options.get("spec_version"),
         )
         if vdr_result.pkg_vulnerabilities:
             all_pkg_vulnerabilities += vdr_result.pkg_vulnerabilities
@@ -745,12 +751,24 @@ def run_depscan(args):
             )
         # CSAF VEX export
         if args.csaf:
-            export_csaf(
-                vdr_result,
-                src_dir,
-                reports_dir,
-                vdr_file,
-            )
+            # Prefer the CDX BOM path so the output is named after the project
+            # (<base>.csaf.json) and the product tree is built from the BOM.
+            # Fall back to the VDR (also a CycloneDX document) when only that
+            # exists. The emit layer guarantees the VDR is never overwritten.
+            csaf_bom_file = bom_file or vdr_file
+            if not csaf_bom_file:
+                LOG.warning(
+                    "CSAF export skipped: no BOM or VDR file is available to "
+                    "name the output and build the product tree."
+                )
+            else:
+                export_csaf(
+                    vdr_result,
+                    src_dir=src_dir,
+                    reports_dir=reports_dir,
+                    bom_file=csaf_bom_file,
+                    csaf_version=getattr(args, "csaf_version", "2.1"),
+                )
     console.record = True
     # Export the console output
     console.save_html(
