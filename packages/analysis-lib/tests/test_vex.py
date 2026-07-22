@@ -343,8 +343,14 @@ def test_refs_advisory_token_extracted_from_title():
 
 def test_refs_dedup():
     references = [
-        {"id": "CVE-2021-1234", "source": {"url": "https://nvd.nist.gov/vuln/detail/CVE-2021-1234"}},
-        {"id": "CVE-2021-1234", "source": {"url": "https://nvd.nist.gov/vuln/detail/CVE-2021-1234"}},
+        {
+            "id": "CVE-2021-1234",
+            "source": {"url": "https://nvd.nist.gov/vuln/detail/CVE-2021-1234"},
+        },
+        {
+            "id": "CVE-2021-1234",
+            "source": {"url": "https://nvd.nist.gov/vuln/detail/CVE-2021-1234"},
+        },
     ]
     refs, ids = build_references_and_ids(references, [])
     assert len(refs) == 1
@@ -425,9 +431,7 @@ def test_tracking_preserves_existing_revisions():
         "version": "1",
         "initial_release_date": "2024-01-01T00:00:00",
         "current_release_date": "2024-02-01T00:00:00",
-        "revision_history": [
-            {"date": "2024-01-01T00:00:00", "number": "1", "summary": "Initial"}
-        ],
+        "revision_history": [{"date": "2024-01-01T00:00:00", "number": "1", "summary": "Initial"}],
     }
     out = build_tracking(raw).to_dict()
     assert len(out["revision_history"]) == 1
@@ -589,7 +593,9 @@ def test_juice_shop_csaf_is_schema_valid_and_reachability_aware(version):
         for p in slice_obj.get("purls") or []:
             key = _up.unquote(p)
             reached[key] = reached.get(key, 0) + 1
-    doc = build_csaf(bom, vdr.get("vulnerabilities", []), reached_purls=reached, csaf_version=version)
+    doc = build_csaf(
+        bom, vdr.get("vulnerabilities", []), reached_purls=reached, csaf_version=version
+    )
     # Zero schema errors and no dangling product references.
     assert validate(doc, version) == []
     assert referenced_product_ids(doc) <= defined_product_ids(doc)

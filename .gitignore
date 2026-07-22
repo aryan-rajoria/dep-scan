@@ -2,6 +2,9 @@
 .idea/
 .gitleaks_bin/
 repos/
+# keep the rusi integration test repos checked in despite the repos/ rule above
+!test/data/rusi/repos/
+!test/data/rusi/repos/**
 .vscode/
 .tox/
 .tool-versions

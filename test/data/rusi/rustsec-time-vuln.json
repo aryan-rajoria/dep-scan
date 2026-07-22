@@ -1,0 +1,49 @@
+{
+  "dataType": "CVE_RECORD",
+  "dataVersion": "5.2",
+  "cveMetadata": {
+    "cveId": "RUSTSEC-2020-0071",
+    "assignerOrgId": "14ed7db2-1595-443d-9d34-6215bf890778",
+    "assignerShortName": "rustsec",
+    "state": "PUBLISHED",
+    "datePublished": "2020-11-18T12:00:00Z"
+  },
+  "containers": {
+    "cna": {
+      "providerMetadata": {
+        "orgId": "14ed7db2-1595-443d-9d34-6215bf890778",
+        "shortName": "rustsec"
+      },
+      "descriptions": [
+        {
+          "lang": "en",
+          "value": "Potential segfault in the time crate (RUSTSEC-2020-0071). The affected functions set environment variables without synchronization; on Unix-like systems time::now/time::at/time::at_utc/time::tzset can segfault in multithreaded programs. Affects time 0.1.x."
+        }
+      ],
+      "affected": [
+        {
+          "vendor": "time-rs",
+          "product": "time",
+          "versions": [
+            {
+              "version": "0.1.45",
+              "status": "affected",
+              "versionType": "cargo",
+              "lessThan": "0.2"
+            }
+          ],
+          "packageURL": "pkg:cargo/time@0.1.45"
+        }
+      ],
+      "references": [
+        {
+          "url": "https://rustsec.org/advisories/RUSTSEC-2020-0071.html"
+        },
+        {
+          "url": "https://www.exploit-db.com/exploits/99999",
+          "tags": ["exploit"]
+        }
+      ]
+    }
+  }
+}

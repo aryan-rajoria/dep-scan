@@ -9,6 +9,7 @@ OWASP dep-scan is a next-generation security and risk audit tool based on known 
 ## Contents
 
 - [Features](#features)
+    - [Rust reachability (via rusi)](#rust-reachability-via-rusi)
     - [Vulnerability Data sources](#vulnerability-data-sources)
     - [Linux distros](#linux-distros)
 - [Quick Start](#quick-start)
@@ -49,6 +50,26 @@ OWASP dep-scan is a next-generation security and risk audit tool based on known 
 Detailed data flows to identify both reachable and non-reachable paths in your application based on the full context.
 
 ![Reachable Flows](documentation/static/img/depscan-flows.png)
+
+### Rust reachability (via rusi)
+
+Rust reachability is powered by [rusi (Rust Source Inspector)](https://github.com/appthreat/rusi) — a Rust analysis engine that emits a call graph and interprocedural source→sink data-flow slices with PURL attribution. dep-scan converts that report into its existing purl-keyed reachability pipeline, so a vulnerable crate that is actually **called** (e.g. `time::now()` for RUSTSEC-2020-0071) is marked **Reachable** while a crate that is merely present in the BOM but never called is not.
+
+**How it runs.** Under `--profile research` (which dep-scan forces when reachability is on), `cdxgen` runs rusi via evinse for Rust projects and persists the full raw rusi report to the `*-semantics.slices.json` path. dep-scan then consumes that persisted report — it does **not** spawn rusi itself when cdxgen + plugins are available. rusi is invoked directly only as a fallback.
+
+**Enabling it.** Reachability is on by default for Rust (`--reachability-analyzer FrameworkReachability`); `SemanticReachability` additionally attributes reached services and endpoints.
+
+```bash
+# rust reachability is automatic; just scan the project
+depscan -i ./my-rust-app -o ./reports --profile research
+
+# point dep-scan at a dev build of rusi
+DEPSCAN_RUSI_BINARY=/path/to/rusi depscan -i ./my-rust-app -o ./reports
+```
+
+**Locating the rusi binary.** dep-scan resolves rusi the same way cdxgen does: the `RUSI_CMD` env var, then `DEPSCAN_RUSI_BINARY`, then `rusi` on `PATH`, then the bundled `cdxgen-plugins-bin` layout (`<pluginsDir>/rusi/rusi-<platform>-<arch>`). When cdxgen spawns, dep-scan propagates `RUSI_CMD` and `CDXGEN_PLUGINS_DIR` to the subprocess so both sides use the same binary. If rusi cannot be found, Rust reachability is skipped with a warning (never a crash); other languages are unaffected.
+
+**Backend safety.** The default `stable` backend is syn-based parsing only and is safe on untrusted repositories. The `compiler` backend embeds nightly rustc and builds the target (runs `cargo`/`rustc`), so it is enabled only via explicit opt-in such as `--deep` or `--rust-analyzer-backend compiler`; consult the rusi threat model before pointing it at untrusted code.
 
 ### Clear insights about CVEs
 

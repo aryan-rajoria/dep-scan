@@ -74,7 +74,9 @@ def _build_document_references(meta: Dict[str, Any]) -> List[Reference]:
         url = (raw.get("url") or "").strip()
         if not summary or not url:
             continue
-        refs.append(Reference(summary=summary, url=url, category=raw.get("category") or "external"))
+        refs.append(
+            Reference(summary=summary, url=url, category=raw.get("category") or "external")
+        )
     return refs
 
 
@@ -125,7 +127,9 @@ def build_csaf(
         notes=_build_document_notes(meta),
         references=_build_document_references(meta),
         aggregate_severity=_aggregate_severity(scores_for_aggregate),
-        tlp_label=(distribution.get("tlp") or {}).get("label") if isinstance(distribution, dict) else None,
+        tlp_label=(distribution.get("tlp") or {}).get("label")
+        if isinstance(distribution, dict)
+        else None,
         distribution_text=distribution.get("text") if isinstance(distribution, dict) else None,
     )
 

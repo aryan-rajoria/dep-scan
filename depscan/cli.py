@@ -91,9 +91,7 @@ VDB_DOWNLOAD_MAX_ATTEMPTS = _positive_int_env("VDB_DOWNLOAD_RETRIES", 3)
 VDB_DOWNLOAD_RETRY_BACKOFF_SEC = _positive_int_env("VDB_DOWNLOAD_RETRY_BACKOFF_SEC", 5)
 
 
-def download_vdb_with_retries(
-    vdb_database_url, data_dir, attempts=VDB_DOWNLOAD_MAX_ATTEMPTS
-):
+def download_vdb_with_retries(vdb_database_url, data_dir, attempts=VDB_DOWNLOAD_MAX_ATTEMPTS):
     """Download the vulnerability database, retrying transient network errors.
 
     ``download_image`` streams large blobs and can fail partway through with a

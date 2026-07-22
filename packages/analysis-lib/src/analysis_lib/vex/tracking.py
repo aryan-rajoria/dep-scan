@@ -55,15 +55,15 @@ def build_tracking(raw: Optional[Dict[str, Any]], generated_id: str = "") -> Tra
         date = _fmt_date(entry.get("date"), now)
         summary = (entry.get("summary") or "").strip()
         if number and date:
-            revisions.append(RevisionEntry(date=date, number=number, summary=summary or INITIAL_SUMMARY))
+            revisions.append(
+                RevisionEntry(date=date, number=number, summary=summary or INITIAL_SUMMARY)
+            )
 
     initial_date = _fmt_date(raw.get("initial_release_date"), now)
     current_date = _fmt_date(raw.get("current_release_date"), initial_date)
 
     if not revisions:
-        revisions.append(
-            RevisionEntry(date=initial_date, number="1", summary=INITIAL_SUMMARY)
-        )
+        revisions.append(RevisionEntry(date=initial_date, number="1", summary=INITIAL_SUMMARY))
 
     # Keep revisions sorted by number; the document version always tracks the
     # latest revision number rather than an arbitrary hand-set value.

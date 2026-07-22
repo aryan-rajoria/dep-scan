@@ -46,7 +46,7 @@ def _sorted_components(bom: Dict[str, Any]):
     for c in bom.get("components", []) or []:
         components.append(c)
     # Sort by purl for stable output; components without a purl sort last by name.
-    return sorted(components, key=lambda c: (c.get("purl") or c.get("name") or ""))
+    return sorted(components, key=lambda c: c.get("purl") or c.get("name") or "")
 
 
 def build_product_tree(

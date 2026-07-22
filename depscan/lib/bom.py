@@ -16,9 +16,15 @@ from xbom_lib.cdxgen import (
     resource_path as xbom_resource_path,
 )
 from depscan.cli_options import DEFAULT_SPEC_VERSION
+from depscan.lib.config import (
+    RUSI_DEFAULT_BACKEND,
+    RUSI_DEFAULT_CALLGRAPH_MODE,
+    RUSI_DEFAULT_DATAFLOW_MODE,
+    RUSI_REACHABLES_SLICE_FILE,
+)
 from depscan.lib.logger import LOG, SPINNER, console
 from depscan.lib.utils import cleanup_license_string
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 
 def _has_bundled_cdxgen() -> bool:
@@ -313,7 +319,152 @@ def create_bom(bom_file, src_dir=".", options=None):
         if not bom_result.success:
             LOG.info("The cdxgen invocation was unsuccessful. Try generating the BOM separately.")
             LOG.debug(bom_result.command_output)
-        return bom_result.success and os.path.exists(bom_file)
+            return False
+        if not os.path.exists(bom_file):
+            return False
+        # Rust reachability via rusi: emits rust-reachables.slices.json next to
+        # the BOM so the existing purl-keyed pipeline picks it up. No-op for
+        # non-rust projects or when reachability is off / rusi is absent.
+        run_rusi_reachability(bom_file, src_dir, options=options)
+        return True
+
+
+def _load_rusi_report(path, is_report_ok, json_load, require_report=False):
+    """Load a rusi report JSON, or return None.
+
+    When ``require_report`` is set, a file that is not a rusi report (e.g. an
+    atom-produced semantics slice that happens to share the path) is rejected
+    by validating its structural SHAPE -- this is how we tell cdxgen's
+    persisted rusi report apart from any other ``*-semantics.slices.json``.
+    When not required (direct-rusi fallback), a shape mismatch only warns.
+    """
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        data = json_load(path, log=LOG)
+    except Exception as e:
+        LOG.debug("Could not read rusi report %s: %s", path, e)
+        return None
+    if not isinstance(data, dict):
+        return None
+    if not is_report_ok(data):
+        if require_report:
+            return None
+        LOG.warning("rusi report shape was not recognized; conversion may be incomplete.")
+    return data
+
+
+def _run_rusi_fallback(src_dir, bom_dir, options, is_report_ok, json_load):
+    """Invoke rusi directly when cdxgen did not produce a report. Returns the
+    parsed report or None. Kept as a fallback so reachability still works when
+    cdxgen/plugins are unavailable."""
+    try:
+        from xbom_lib.rusi import run_rusi
+    except ImportError as e:
+        LOG.debug("rusi runner unavailable: %s", e)
+        return None
+    report_path = os.path.join(bom_dir, "rusi.json")
+    # Backend safety gate (per rusi THREAT_MODEL). ``stable`` is parsing-only
+    # and safe on untrusted repos; ``compiler`` builds the target and is only
+    # enabled via explicit ``--rust-analyzer-backend compiler`` or ``--deep``.
+    backend = options.get("rust_analyzer_backend") or RUSI_DEFAULT_BACKEND
+    if options.get("deep_scan") or options.get("deep"):
+        backend = "compiler"
+    with console.status(f"Running rusi Rust reachability on '{src_dir}'.", spinner=SPINNER):
+        res = run_rusi(
+            src_dir,
+            report_path,
+            backend=backend,
+            callgraph_mode=RUSI_DEFAULT_CALLGRAPH_MODE,
+            dataflow_mode=RUSI_DEFAULT_DATAFLOW_MODE,
+            logger=LOG,
+        )
+    if res.skipped or not res.success or not os.path.exists(report_path):
+        return None
+    return _load_rusi_report(report_path, is_report_ok, json_load, require_report=False)
+
+
+def run_rusi_reachability(
+    bom_file: str,
+    src_dir: str,
+    options: Optional[Dict] = None,
+) -> bool:
+    """Run rusi + the slice converter for a Rust project and drop the
+    atom-shaped reachables slice next to the BOM.
+
+    No-op (returns False) unless the project is Rust AND reachability is on.
+    Gracefully degrades when the rusi binary is missing (warns, returns False,
+    never raises) so non-Rust and binary-less environments are unaffected.
+
+    This is the ONLY wiring point for rusi reachability: the existing
+    purl-keyed reachability pipeline discovers ``*reachables.slices*.json``
+    files by glob, so emitting ``rust-reachables.slices.json`` in the BOM dir
+    lights up FrameworkReachability/SemanticReachability with zero engine
+    changes.
+    """
+    if not options:
+        return False
+    project_type_list: List[str] = options.get("project_type") or []
+    if "rust" not in project_type_list:
+        return False
+    if options.get("reachability_analyzer") == "off":
+        return False
+    if not bom_file or not os.path.exists(bom_file):
+        return False
+    # Lazy imports so non-Rust scans never pay the import cost and tests that
+    # monkeypatch the binary can run in isolation.
+    try:
+        from analysis_lib.rusi_slices import (
+            build_bom_purl_index,
+            convert_rusi_report,
+            is_rusi_report,
+            write_slices_file,
+        )
+        from custom_json_diff.lib.utils import json_load as _json_load
+    except ImportError as e:
+        LOG.debug("rusi reachability dependencies unavailable: %s", e)
+        return False
+
+    bom_dir = os.path.dirname(os.path.abspath(bom_file))
+    slice_path = os.path.join(bom_dir, RUSI_REACHABLES_SLICE_FILE)
+    prefix = project_type_list[0] if project_type_list else "rust"
+
+    # Prefer the rusi report cdxgen already produced. Under ``--profile
+    # research`` cdxgen runs rusi via evinse for rust and (cdxgen >= 12.5.1)
+    # persists the full raw rusi report to the ``--semantics-slices-file`` path
+    # -- which depscan's set_slices_args passes as
+    # ``<bomdir>/<type>-semantics.slices.json``. Consuming that means depscan
+    # need NOT invoke rusi itself when cdxgen + plugins are available, and it
+    # reads the FULL original report (call graph + data-flow slices), not the
+    # projected subset cdxgen embeds in the SBOM.
+    cdxgen_report_path = os.path.join(bom_dir, f"{prefix}-semantics.slices.json")
+    report = _load_rusi_report(cdxgen_report_path, is_rusi_report, _json_load, require_report=True)
+    if report is not None:
+        LOG.debug(
+            "rusi reachability: using cdxgen-produced report at %s",
+            cdxgen_report_path,
+        )
+    else:
+        # Fallback: cdxgen did not produce a rusi report (plugins unavailable,
+        # or reachability invoked without cdxgen). Invoke rusi directly.
+        report = _run_rusi_fallback(src_dir, bom_dir, options, is_rusi_report, _json_load)
+    if report is None:
+        LOG.debug("No rusi report available; reachability via rusi skipped.")
+        return False
+
+    bom_data = _json_load(bom_file, log=LOG) or {}
+    components = bom_data.get("components", []) or []
+    # Include the metadata.component (workspace root) so the versioned
+    # workspace purl is always in the reconciliation index.
+    extra = []
+    meta_comp = (bom_data.get("metadata") or {}).get("component")
+    if isinstance(meta_comp, dict):
+        extra.append(meta_comp)
+    bom_index = build_bom_purl_index(components, extra_components=extra)
+    flows = convert_rusi_report(report, bom_index)
+    write_slices_file(slice_path, flows)
+    LOG.debug("rusi reachability: wrote %d flows to %s", len(flows), slice_path)
+    return True
 
 
 def create_blint_bom(bom_file: str, src_dir: str = ".", options: Optional[Dict] = None) -> bool:
@@ -425,6 +576,12 @@ def create_lifecycle_boms(cdxgen_lib, src_dir, options):
         )
     else:
         any_success = True
+    # Rust reachability via rusi: run once against the source and drop the
+    # slice next to the build BOM (the bom_dir the reachability engine scans).
+    # No-op for non-rust projects, when reachability is off, or when rusi is
+    # absent.
+    if any_success and "rust" in (options.get("project_type") or []):
+        run_rusi_reachability(build_bom_file, src_dir, options=options)
     return any_success
 
 
