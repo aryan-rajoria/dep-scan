@@ -1,0 +1,79 @@
+[
+  {
+    "flows": [
+      {
+        "code": "reqwest::Client::new",
+        "columnNumber": 17,
+        "fullName": "vulnerable_web_app::main",
+        "id": "rusi-cg-94fc2317a01228bd",
+        "lineNumber": 14,
+        "tags": "pkg:cargo/reqwest@0.11.27, call-graph, rust, call-graph"
+      }
+    ],
+    "purls": [
+      "pkg:cargo/reqwest@0.11.27"
+    ]
+  },
+  {
+    "flows": [
+      {
+        "code": "sqlx::query",
+        "columnNumber": 13,
+        "fullName": "vulnerable_web_app::main",
+        "id": "rusi-cg-e10ecbb089f081c2",
+        "lineNumber": 11,
+        "tags": "pkg:cargo/sqlx@0.6.2, call-graph, rust, call-graph"
+      }
+    ],
+    "purls": [
+      "pkg:cargo/sqlx@0.6.2"
+    ]
+  },
+  {
+    "flows": [
+      {
+        "code": "fs::read_to_string",
+        "columnNumber": 18,
+        "fullName": "vulnerable_web_app::main",
+        "id": "df-source",
+        "lineNumber": 9,
+        "tags": "pkg:cargo/vulnerable-web-app@0.1.0, file, rust, file-to-sql-query"
+      },
+      {
+        "code": "sqlx::query",
+        "columnNumber": 13,
+        "fullName": "vulnerable_web_app::main",
+        "id": "df-sqlx",
+        "lineNumber": 11,
+        "tags": "pkg:cargo/sqlx@0.6.2, sql, sql-query, rust, file-to-sql-query"
+      },
+      {
+        "code": "fetch_one",
+        "columnNumber": 13,
+        "fullName": "vulnerable_web_app::main",
+        "id": "df-sink",
+        "lineNumber": 11,
+        "tags": "pkg:cargo/vulnerable-web-app@0.1.0, sql, sql-query, rust, file-to-sql-query"
+      }
+    ],
+    "purls": [
+      "pkg:cargo/sqlx@0.6.2",
+      "pkg:cargo/vulnerable-web-app@0.1.0"
+    ]
+  },
+  {
+    "flows": [
+      {
+        "code": "warp::path::param",
+        "columnNumber": 17,
+        "fullName": "vulnerable_web_app::main",
+        "id": "rusi-cg-20a09ef8d5be78b9",
+        "lineNumber": 13,
+        "tags": "pkg:cargo/warp@0.3.6, call-graph, rust, call-graph"
+      }
+    ],
+    "purls": [
+      "pkg:cargo/warp@0.3.6"
+    ]
+  }
+]

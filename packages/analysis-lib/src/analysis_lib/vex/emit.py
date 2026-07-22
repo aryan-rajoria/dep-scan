@@ -85,6 +85,7 @@ def _cvss_registry() -> Registry:
             )
     return Registry().with_resources(resources_list)
 
+
 # Default document/publisher metadata used when no csaf.toml is present so the
 # tool produces a usable document on the first run.
 DEFAULT_META: Dict[str, Any] = {
@@ -248,8 +249,7 @@ def export_csaf(
     errors = validate(doc, csaf_version)
     if errors:
         LOG.warning(
-            "CSAF document generated with %d schema validation error(s); "
-            "first few: %s",
+            "CSAF document generated with %d schema validation error(s); first few: %s",
             len(errors),
             errors[:3],
         )

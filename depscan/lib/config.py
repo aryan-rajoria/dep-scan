@@ -321,3 +321,20 @@ COMMON_CHECK_TAGS = (
     "authentication",
     "authorization",
 )
+
+# --- rusi (Rust Source Inspector) reachability ---------------------------
+# env override for the rusi binary path. Mirrors RUSI_BINARY_ENV in
+# xbom_lib/rusi.py; duplicated here so the CLI/config layer is standalone.
+RUSI_BINARY_ENV = "DEPSCAN_RUSI_BINARY"
+# rusi reports are detected by structural SHAPE (call_graph/data_flow +
+# tool/runtime), not a schema_version prefix -- see analysis_lib.rusi_slices.
+# Default rusi backend. ``stable`` = syn-based parsing, no cargo/rustc build
+# (safe on untrusted repos). ``compiler`` embeds nightly rustc and builds the
+# target -- only enabled via ``--deep`` or ``--rust-analyzer-backend compiler``.
+RUSI_DEFAULT_BACKEND = "stable"
+RUSI_DEFAULT_DATAFLOW_MODE = "security-deps"
+RUSI_DEFAULT_CALLGRAPH_MODE = "static"
+# Slice file dep-scan writes for rust projects. Matches the name cdxgen uses
+# for atom reachables slices (set_slices_args in xbom_lib/cdxgen.py) so the
+# glob-based discovery in ReachabilityAnalysisKV picks it up unchanged.
+RUSI_REACHABLES_SLICE_FILE = "rust-reachables.slices.json"

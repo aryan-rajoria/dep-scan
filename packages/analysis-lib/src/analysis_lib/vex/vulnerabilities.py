@@ -62,9 +62,7 @@ def _extra_cwe_notes(cwes: List[Dict[str, str]]) -> List[Note]:
     return notes
 
 
-def _build_notes(
-    vuln: Dict[str, Any], extra_cwe_notes: List[Note]
-) -> List[Note]:
+def _build_notes(vuln: Dict[str, Any], extra_cwe_notes: List[Note]) -> List[Note]:
     """Assemble notes that always carry non-empty text."""
     notes: List[Note] = list(extra_cwe_notes)
 
@@ -132,9 +130,7 @@ def build_vulnerability(
                 )
             )
 
-    flag_models = [
-        Flag(label=f["label"], product_ids=f["product_ids"]) for f in flags
-    ]
+    flag_models = [Flag(label=f["label"], product_ids=f["product_ids"]) for f in flags]
     reference_models = [
         Reference(summary=r["summary"], url=r["url"], category=r.get("category"))
         for r in references

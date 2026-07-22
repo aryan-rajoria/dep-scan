@@ -39,9 +39,7 @@ def _normalize_cvss_dict(family: str, raw: Dict[str, Any]) -> Dict[str, Any]:
         out[k] = v
     # CSAF requires ``version`` consistent with the family.
     if "version" not in out:
-        out["version"] = {"cvss_v2": "2.0", "cvss_v3": "3.1", "cvss_v4": "4.0"}.get(
-            family, "3.1"
-        )
+        out["version"] = {"cvss_v2": "2.0", "cvss_v3": "3.1", "cvss_v4": "4.0"}.get(family, "3.1")
     return out
 
 

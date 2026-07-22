@@ -221,9 +221,7 @@ class Vulnerability:
         out: Dict[str, Any] = {
             "title": self.title,
             "notes": [n.to_dict() for n in self.notes if n.text],
-            "product_status": {
-                k: sorted(set(v)) for k, v in self.product_status.items() if v
-            },
+            "product_status": {k: sorted(set(v)) for k, v in self.product_status.items() if v},
             "references": [r.to_dict() for r in self.references],
             "ids": self.ids,
         }
@@ -242,9 +240,7 @@ class Vulnerability:
         # 2.0 exposes this timestamp as ``release_date``; 2.1 renamed it to
         # ``disclosure_date`` and dropped ``release_date``.
         if self.disclosure_date:
-            out["disclosure_date" if version == "2.1" else "release_date"] = (
-                self.disclosure_date
-            )
+            out["disclosure_date" if version == "2.1" else "release_date"] = self.disclosure_date
         if self.threats:
             out["threats"] = self.threats
         if self.remediations:

@@ -1,0 +1,10 @@
+[package]
+name = "rustsec-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# RUSTSEC-2020-0071: time 0.1.x is vulnerable (segfault). Pinned at the
+# latest 0.1.x so cargo metadata resolves a real, populated Cargo.lock and
+# the BOM carries a versioned pkg:cargo/time@0.1.45 for the VDR to match.
+time = "0.1"

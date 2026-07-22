@@ -152,6 +152,18 @@ def build_parser():
         help="Reachability analyzer to use. Default FrameworkReachability.",
     )
     parser.add_argument(
+        "--rust-analyzer-backend",
+        choices=("stable", "compiler"),
+        default=os.getenv("DEPSCAN_RUSI_BACKEND", "stable"),
+        dest="rust_analyzer_backend",
+        help="rusi (Rust Source Inspector) backend for Rust reachability. "
+        "``stable`` (default) is syn-based parsing with no cargo/rustc build "
+        "and is safe on untrusted repos. ``compiler`` embeds nightly rustc "
+        "and builds the target for higher fidelity -- only use on trusted "
+        "input (see rusi THREAT_MODEL). Implied by --deep for Rust projects. "
+        "Set DEPSCAN_RUSI_BINARY to point at a non-PATH rusi binary.",
+    )
+    parser.add_argument(
         "--no-suggest",
         action="store_false",
         default=True,

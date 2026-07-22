@@ -150,6 +150,27 @@ def exec_tool(
     return result
 
 
+def _set_plugins_dir_if_present(candidate: str) -> None:
+    """Point ``CDXGEN_PLUGINS_DIR`` at ``candidate`` only when it actually holds
+    a cdxgen plugins tree.
+
+    The bundled ``local_bin/cdxgen`` is a self-contained caxa binary that
+    already carries ``@cdxgen/cdxgen-plugins-bin`` and auto-detects it from its
+    own extraction directory. cdxgen gives ``CDXGEN_PLUGINS_DIR`` top priority,
+    so pointing it at ``local_bin`` (which contains only the cdxgen binary)
+    would OVERRIDE and disable the bundled plugins (rusi/golem/osquery). Only
+    set it for genuine npm-style layouts where a ``plugins`` dir or a tool
+    subdir (e.g. ``rusi``) is present next to the resolved path.
+    """
+    if not candidate or not os.path.isdir(candidate):
+        return
+    has_plugins = os.path.isdir(os.path.join(candidate, "plugins")) or any(
+        os.path.isdir(os.path.join(candidate, tool)) for tool in ("rusi", "golem", "osquery")
+    )
+    if has_plugins:
+        os.environ["CDXGEN_PLUGINS_DIR"] = candidate
+
+
 def find_cdxgen_cmd(use_bin=True, logger: Optional[Logger] = None):
     if use_bin:
         cdxgen_cmd = os.environ.get("CDXGEN_CMD", "cdxgen")
@@ -179,8 +200,9 @@ def find_cdxgen_cmd(use_bin=True, logger: Optional[Logger] = None):
                         os.chmod(cdxgen_cmd, current_mode | 0o755)
                 except OSError:
                     pass
-            # Set the plugins directory as an environment variable
-            os.environ["CDXGEN_PLUGINS_DIR"] = resource_path("local_bin")
+            # The bundled caxa cdxgen auto-detects its own plugins; only set
+            # CDXGEN_PLUGINS_DIR when local_bin actually carries a plugins tree.
+            _set_plugins_dir_if_present(resource_path("local_bin"))
             return cdxgen_cmd
         else:
             return cdxgen_cmd
@@ -201,8 +223,9 @@ def find_cdxgen_cmd(use_bin=True, logger: Optional[Logger] = None):
                 )
             return None
         cdxgen_cmd = local_bin
-        # Set the plugins directory as an environment variable
-        os.environ["CDXGEN_PLUGINS_DIR"] = (
+        # Set the plugins directory only when it actually holds a plugins tree,
+        # so a bundled caxa cdxgen can auto-detect its own plugins instead.
+        plugins_candidate = (
             resource_path("local_bin")
             if sys.platform != "win32"
             else resource_path(
@@ -212,6 +235,7 @@ def find_cdxgen_cmd(use_bin=True, logger: Optional[Logger] = None):
                 )
             )
         )
+        _set_plugins_dir_if_present(plugins_candidate)
         return cdxgen_cmd
 
 
@@ -279,6 +303,16 @@ class CdxgenGenerator(XBOMGenerator):
             )
             env["CDXGEN_TEMP_DIR"] = cdxgen_temp_dir
         env["CDXGEN_TIMEOUT_MS"] = CDXGEN_TIMEOUT_MS
+        # Propagate plugin-discovery env to the cdxgen subprocess so cdxgen can
+        # locate the SAME rusi binary depscan resolved (RUSI_CMD) and the
+        # plugins dir find_cdxgen_cmd just detected (CDXGEN_PLUGINS_DIR). ``env``
+        # was copied before find_cdxgen_cmd ran, so re-sync these explicitly
+        # rather than relying on copy order; this keeps cdxgen's rusi resolution
+        # consistent with depscan's fallback in xbom_lib/rusi.py.
+        for _plug_env in ("RUSI_CMD", "CDXGEN_PLUGINS_DIR"):
+            _plug_val = os.environ.get(_plug_env)
+            if _plug_val:
+                env[_plug_env] = _plug_val
         if cdxgen_cmd:
             bom_result = exec_tool(
                 args,
