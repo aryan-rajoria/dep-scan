@@ -413,6 +413,75 @@ def test_reachability_drops_unknown_purl():
     assert scores == []
 
 
+def _multi_lang_purl_map():
+    """Product tree with Rust (cargo) and Go (golang) components, mirroring the
+    versioned purls the rusi/golem converters reconcile against the BOM."""
+    bom = {
+        "components": [
+            {"name": "sqlx", "version": "0.6.2", "purl": "pkg:cargo/sqlx@0.6.2"},
+            {"name": "serde", "version": "1.0.152", "purl": "pkg:cargo/serde@1.0.152"},
+            {
+                "name": "pgx",
+                "version": "4.18.1",
+                "purl": "pkg:golang/github.com/jackc/pgx/v4@v4.18.1",
+            },
+            {
+                "name": "yaml.v2",
+                "version": "2.4.0",
+                "purl": "pkg:golang/gopkg.in/yaml.v2@v2.4.0",
+            },
+        ]
+    }
+    _, pmap = build_product_tree(bom)
+    return pmap
+
+
+def test_reachability_rust_reachable_is_known_affected():
+    """A Rust crate whose reconciled purl carries a reachable flow (rusi) must
+    map to known_affected -- CSAF VEX is purl-keyed and language-agnostic."""
+    pmap = _multi_lang_purl_map()
+    vuln = {"affects": [{"ref": "pkg:cargo/sqlx@0.6.2"}]}
+    status, flags, scores = classify(vuln, pmap, {"pkg:cargo/sqlx@0.6.2": 3})
+    assert status == {KNOWN_AFFECTED: ["pkg:cargo/sqlx@0.6.2"]}
+    assert flags == []
+    assert scores == ["pkg:cargo/sqlx@0.6.2"]
+
+
+def test_reachability_rust_unreachable_gets_not_in_path_flag():
+    """A Rust crate present but unreached must map to known_not_affected with
+    the vulnerable_code_not_in_execute_path justification flag."""
+    pmap = _multi_lang_purl_map()
+    vuln = {"affects": [{"ref": "pkg:cargo/serde@1.0.152"}]}
+    status, flags, scores = classify(vuln, pmap, {"pkg:cargo/sqlx@0.6.2": 3})
+    assert status == {KNOWN_NOT_AFFECTED: ["pkg:cargo/serde@1.0.152"]}
+    assert len(flags) == 1
+    assert flags[0]["label"] == "vulnerable_code_not_in_execute_path"
+    assert flags[0]["product_ids"] == ["pkg:cargo/serde@1.0.152"]
+
+
+def test_reachability_go_reachable_is_known_affected():
+    """A Go module whose versioned purl (golem) carries a reachable flow must
+    map to known_affected."""
+    pmap = _multi_lang_purl_map()
+    vuln = {"affects": [{"ref": "pkg:golang/github.com/jackc/pgx/v4@v4.18.1"}]}
+    status, flags, scores = classify(vuln, pmap, {"pkg:golang/github.com/jackc/pgx/v4@v4.18.1": 1})
+    assert status == {KNOWN_AFFECTED: ["pkg:golang/github.com/jackc/pgx/v4@v4.18.1"]}
+    assert flags == []
+    assert scores == ["pkg:golang/github.com/jackc/pgx/v4@v4.18.1"]
+
+
+def test_reachability_go_unreachable_gets_not_in_path_flag():
+    """A Go module present but unreached must map to known_not_affected with
+    the vulnerable_code_not_in_execute_path justification flag."""
+    pmap = _multi_lang_purl_map()
+    vuln = {"affects": [{"ref": "pkg:golang/gopkg.in/yaml.v2@v2.4.0"}]}
+    status, flags, scores = classify(vuln, pmap, {"pkg:golang/github.com/jackc/pgx/v4@v4.18.1": 1})
+    assert status == {KNOWN_NOT_AFFECTED: ["pkg:golang/gopkg.in/yaml.v2@v2.4.0"]}
+    assert len(flags) == 1
+    assert flags[0]["label"] == "vulnerable_code_not_in_execute_path"
+    assert flags[0]["product_ids"] == ["pkg:golang/gopkg.in/yaml.v2@v2.4.0"]
+
+
 # ---------------------------------------------------------------------------
 # tracking
 # ---------------------------------------------------------------------------

@@ -5,6 +5,9 @@ repos/
 # keep the rusi integration test repos checked in despite the repos/ rule above
 !test/data/rusi/repos/
 !test/data/rusi/repos/**
+# keep the golem integration test repos checked in too
+!test/data/golem/repos/
+!test/data/golem/repos/**
 .vscode/
 .tox/
 .tool-versions

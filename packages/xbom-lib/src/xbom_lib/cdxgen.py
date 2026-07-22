@@ -309,7 +309,7 @@ class CdxgenGenerator(XBOMGenerator):
         # was copied before find_cdxgen_cmd ran, so re-sync these explicitly
         # rather than relying on copy order; this keeps cdxgen's rusi resolution
         # consistent with depscan's fallback in xbom_lib/rusi.py.
-        for _plug_env in ("RUSI_CMD", "CDXGEN_PLUGINS_DIR"):
+        for _plug_env in ("RUSI_CMD", "GOLEM_CMD", "CDXGEN_PLUGINS_DIR"):
             _plug_val = os.environ.get(_plug_env)
             if _plug_val:
                 env[_plug_env] = _plug_val

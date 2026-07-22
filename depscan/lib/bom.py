@@ -17,6 +17,9 @@ from xbom_lib.cdxgen import (
 )
 from depscan.cli_options import DEFAULT_SPEC_VERSION
 from depscan.lib.config import (
+    GOLEM_DEFAULT_CALLGRAPH_MODE,
+    GOLEM_DEFAULT_DATAFLOW_MODE,
+    GOLEM_REACHABLES_SLICE_FILE,
     RUSI_DEFAULT_BACKEND,
     RUSI_DEFAULT_CALLGRAPH_MODE,
     RUSI_DEFAULT_DATAFLOW_MODE,
@@ -326,6 +329,10 @@ def create_bom(bom_file, src_dir=".", options=None):
         # the BOM so the existing purl-keyed pipeline picks it up. No-op for
         # non-rust projects or when reachability is off / rusi is absent.
         run_rusi_reachability(bom_file, src_dir, options=options)
+        # Go reachability via golem: emits go-reachables.slices.json next to
+        # the BOM. No-op for non-go projects or when reachability is off /
+        # golem is absent.
+        run_golem_reachability(bom_file, src_dir, options=options)
         return True
 
 
@@ -405,7 +412,10 @@ def run_rusi_reachability(
     if not options:
         return False
     project_type_list: List[str] = options.get("project_type") or []
-    if "rust" not in project_type_list:
+    # cdxgen labels Cargo projects "rust"; accept the "cargo"/"crates" aliases
+    # too so an alternate project-type token never silently skips reachability
+    # (mirrors the "go"/"golang" acceptance in run_golem_reachability).
+    if not any(pt in ("rust", "cargo", "crates") for pt in project_type_list):
         return False
     if options.get("reachability_analyzer") == "off":
         return False
@@ -464,6 +474,138 @@ def run_rusi_reachability(
     flows = convert_rusi_report(report, bom_index)
     write_slices_file(slice_path, flows)
     LOG.debug("rusi reachability: wrote %d flows to %s", len(flows), slice_path)
+    return True
+
+
+def _load_golem_report(path, is_report_ok, json_load, require_report=False):
+    """Load a golem report JSON, or return None.
+
+    When ``require_report`` is set, a file that is not a golem report (e.g. an
+    atom-produced semantics slice that happens to share the path) is rejected
+    by validating its structural SHAPE (``callGraph``/``dataFlow`` +
+    ``tool``/``runtime``) -- this is how we tell cdxgen's persisted golem report
+    apart from any other ``*-semantics.slices.json``. When not required (direct-
+    golem fallback), a shape mismatch only warns.
+    """
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        data = json_load(path, log=LOG)
+    except Exception as e:
+        LOG.debug("Could not read golem report %s: %s", path, e)
+        return None
+    if not isinstance(data, dict):
+        return None
+    if not is_report_ok(data):
+        if require_report:
+            return None
+        LOG.warning("golem report shape was not recognized; conversion may be incomplete.")
+    return data
+
+
+def _run_golem_fallback(src_dir, bom_dir, options, is_report_ok, json_load):
+    """Invoke golem directly when cdxgen did not produce a report. Returns the
+    parsed report or None. Kept as a fallback so reachability still works when
+    cdxgen/plugins are unavailable."""
+    try:
+        from xbom_lib.golem import run_golem
+    except ImportError as e:
+        LOG.debug("golem runner unavailable: %s", e)
+        return None
+    report_path = os.path.join(bom_dir, "golem.json")
+    network_mode = options.get("go_analyzer_network") or "auto"
+    deep = bool(options.get("deep_scan") or options.get("deep"))
+    with console.status(f"Running golem Go reachability on '{src_dir}'.", spinner=SPINNER):
+        res = run_golem(
+            src_dir,
+            report_path,
+            callgraph_mode=GOLEM_DEFAULT_CALLGRAPH_MODE,
+            dataflow_mode=GOLEM_DEFAULT_DATAFLOW_MODE,
+            network_mode=network_mode,
+            deep=deep,
+            logger=LOG,
+        )
+    if res.skipped or not res.success or not os.path.exists(report_path):
+        return None
+    return _load_golem_report(report_path, is_report_ok, json_load, require_report=False)
+
+
+def run_golem_reachability(
+    bom_file: str,
+    src_dir: str,
+    options: Optional[Dict] = None,
+) -> bool:
+    """Run golem + the slice converter for a Go project and drop the
+    atom-shaped reachables slice next to the BOM.
+
+    No-op (returns False) unless the project is Go AND reachability is on.
+    Gracefully degrades when the golem binary or Go toolchain is missing
+    (warns, returns False, never raises) so non-Go and binary-less
+    environments are unaffected.
+
+    This is the ONLY wiring point for golem reachability: the existing
+    purl-keyed reachability pipeline discovers ``*reachables.slices*.json``
+    files by glob, so emitting ``go-reachables.slices.json`` in the BOM dir
+    lights up FrameworkReachability/SemanticReachability with zero engine
+    changes.
+    """
+    if not options:
+        return False
+    project_type_list: List[str] = options.get("project_type") or []
+    if not any(pt in ("go", "golang") for pt in project_type_list):
+        return False
+    if options.get("reachability_analyzer") == "off":
+        return False
+    if not bom_file or not os.path.exists(bom_file):
+        return False
+    try:
+        from analysis_lib.golem_slices import (
+            build_bom_purl_index,
+            convert_golem_report,
+            is_golem_report,
+            write_slices_file,
+        )
+        from custom_json_diff.lib.utils import json_load as _json_load
+    except ImportError as e:
+        LOG.debug("golem reachability dependencies unavailable: %s", e)
+        return False
+
+    bom_dir = os.path.dirname(os.path.abspath(bom_file))
+    slice_path = os.path.join(bom_dir, GOLEM_REACHABLES_SLICE_FILE)
+    prefix = project_type_list[0] if project_type_list else "go"
+
+    # Prefer the golem report cdxgen already produced. Under ``--profile
+    # research`` cdxgen runs golem and (when the sibling cdxgen persistence
+    # change lands) persists the full raw golem report to the
+    # ``--semantics-slices-file`` path -- which depscan's set_slices_args
+    # passes as ``<bomdir>/<type>-semantics.slices.json``.
+    cdxgen_report_path = os.path.join(bom_dir, f"{prefix}-semantics.slices.json")
+    report = _load_golem_report(
+        cdxgen_report_path, is_golem_report, _json_load, require_report=True
+    )
+    if report is not None:
+        LOG.debug(
+            "golem reachability: using cdxgen-produced report at %s",
+            cdxgen_report_path,
+        )
+    else:
+        # Fallback: cdxgen did not produce a golem report (plugins unavailable,
+        # or reachability invoked without cdxgen). Invoke golem directly.
+        report = _run_golem_fallback(src_dir, bom_dir, options, is_golem_report, _json_load)
+    if report is None:
+        LOG.debug("No golem report available; reachability via golem skipped.")
+        return False
+
+    bom_data = _json_load(bom_file, log=LOG) or {}
+    components = bom_data.get("components", []) or []
+    extra = []
+    meta_comp = (bom_data.get("metadata") or {}).get("component")
+    if isinstance(meta_comp, dict):
+        extra.append(meta_comp)
+    bom_index = build_bom_purl_index(components, extra_components=extra)
+    flows = convert_golem_report(report, bom_index)
+    write_slices_file(slice_path, flows)
+    LOG.debug("golem reachability: wrote %d flows to %s", len(flows), slice_path)
     return True
 
 
@@ -580,8 +722,16 @@ def create_lifecycle_boms(cdxgen_lib, src_dir, options):
     # slice next to the build BOM (the bom_dir the reachability engine scans).
     # No-op for non-rust projects, when reachability is off, or when rusi is
     # absent.
-    if any_success and "rust" in (options.get("project_type") or []):
+    if any_success and any(
+        pt in ("rust", "cargo", "crates") for pt in (options.get("project_type") or [])
+    ):
         run_rusi_reachability(build_bom_file, src_dir, options=options)
+    # Go reachability via golem: run once against the source and drop the
+    # slice next to the build BOM (the bom_dir the reachability engine scans).
+    # No-op for non-go projects, when reachability is off, or when golem is
+    # absent.
+    if any_success and any(pt in ("go", "golang") for pt in (options.get("project_type") or [])):
+        run_golem_reachability(build_bom_file, src_dir, options=options)
     return any_success
 
 

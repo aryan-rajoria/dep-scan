@@ -218,6 +218,33 @@ def is_cpp_flow(flows):
     return False
 
 
+def is_analyzer_slice(flows):
+    """Detect whether a flows list was produced by the rusi/golem converters
+    rather than atom.
+
+    The converters always emit an explicit ``rust`` / ``go`` language token as
+    a standalone comma-separated entry in every node's ``tags`` string (see the
+    ``_build_node_tags`` helpers in ``rusi_slices``/``golem_slices``). We match
+    that token exactly -- a raw substring test would false-positive on atom
+    tags containing purls like ``google``/``mongodb``/``django`` and wrongly
+    relax the gates for real Java/JS projects. When true, the explainer relaxes
+    the minimum rendered-node count so honest 2-node Rust/Go flows render while
+    atom flows keep the stricter bar.
+    """
+    if not flows:
+        return False
+    for node in flows:
+        if not isinstance(node, dict):
+            continue
+        tags = node.get("tags") or ""
+        if not isinstance(tags, str):
+            continue
+        tokens = {t.strip() for t in tags.split(",")}
+        if "rust" in tokens or "go" in tokens:
+            return True
+    return False
+
+
 def explain_reachables(
     explanation_mode,
     reachables,
@@ -251,9 +278,14 @@ def explain_reachables(
         cpp_flow = is_cpp_flow(areach.get("flows"))
         if not has_cpp_flow and cpp_flow:
             has_cpp_flow = True
+        analyzer_slice = is_analyzer_slice(areach.get("flows"))
+        # Analyzer slices (rusi/golem) carry honest 2-node flows; relax the
+        # raw-count minimum from 2 to 1 so even single-purl endpoint flows
+        # are not dropped before the added-id gate below.
+        min_raw_nodes = 1 if analyzer_slice else 2
         if (
             not areach.get("flows")
-            or len(areach.get("flows")) < 2
+            or len(areach.get("flows")) < min_raw_nodes
             or (not areach.get("purls") and not cpp_flow)
         ):
             continue
@@ -280,10 +312,18 @@ def explain_reachables(
         # The goal is to reduce duplicate explanations by checking if a given flow is similar to one we have explained
         # before. We do this by checking the node ids, source-sink explanations, purl tags and so on.
         added_ids_str = "-".join(added_ids)
+        # Analyzer slices (rusi/golem) carry honest 2-node flows; lower the
+        # minimum from 4 to 2 rendered nodes so they render while noisy atom
+        # flows keep the stricter bar.
+        min_added = 2 if analyzer_slice else 4
+        # Child-count gate is independent of the added-id gate: analyzer flows
+        # need only a source->sink pair (>=1 child), while atom flows keep the
+        # original >=4 bar so Java/JS explanation quality is unchanged.
+        min_children = 1 if analyzer_slice else 4
         # Have we seen this sequence before?
-        if explained_ids.get(added_ids_str) or len(added_ids) < 4:
+        if explained_ids.get(added_ids_str) or len(added_ids) < min_added:
             continue
-        if not source_sink_desc or not flow_tree or len(flow_tree.children) < 4:
+        if not source_sink_desc or not flow_tree or len(flow_tree.children) < min_children:
             continue
         # In non-reachables mode, we are not interested in reachable flows.
         if explanation_mode and explanation_mode in ("NonReachables",) and not has_check_tag:
@@ -470,7 +510,7 @@ def flow_to_source_sink(idx, flow, purls, project_type, vdr_result, purl_vuln_ma
     parent_file = flow.get("parentFileName", "")
     parent_method = flow.get("parentMethodName") or ""
     # Improve the labels based on the language
-    if re.search(".(js|ts|jsx|tsx|py|cs|php)$", parent_file):
+    if re.search(".(js|ts|jsx|tsx|py|cs|php|rs|go)$", parent_file):
         method_str = "function"
         param_str = "argument"
         if parent_method in ("handleRequest",):
@@ -513,6 +553,8 @@ def flow_to_source_sink(idx, flow, purls, project_type, vdr_result, purl_vuln_ma
         source_sink_desc = "The flow originates from an npm package."
     elif "vendor" in parent_file:
         source_sink_desc = "The flow originates from a vendored dependency."
+    elif "/go/pkg/mod" in parent_file:
+        source_sink_desc = "The flow originates from a vendored/module-cache dependency."
     elif len(purls) == 0:
         if tags:
             source_sink_desc = (
