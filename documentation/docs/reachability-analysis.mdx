@@ -1,143 +1,57 @@
 ---
 sidebar_position: 5
+title: Reachability Analysis
 ---
 
-# Reachability Analysis
+# Reachability analysis
 
-depscan can perform reachability analysis for Java, JavaScript, TypeScript, and Python with built-in support for parsing [atom](https://github.com/AppThreat/atom) reachables slices.
+Reachability analysis is the technique of determining which dependencies in a BOM are actually exercised by your code, and on which paths. A dependency that is declared in a manifest but never called is *present*; a dependency whose functions sit on a data-flow or call-graph path that starts from a real entry point is *reachable*. dep-scan computes reachability before it consults vulnerability data, so a vulnerable package is only escalated when its code is demonstrably on an executed path.
 
-## Our approach
+This page is the hub for the reachability documentation set. It states the core ideas and the language-by-analyzer matrix, then links into the concept, language, analyzer, and output chapters where each topic is developed in depth.
 
-There are many ways to perform reachability analysis. Most tools—including commercial ones—rely on a vulnerability database with affected modules (sinks) to detect reachable flows.
+## How dep-scan thinks about reachability
 
-This has several downsides:
+dep-scan separates the work into two layers. First, a per-language *slicer* inspects the source (and, for .NET, the assemblies) and emits data-flow and call-graph slices with purl attribution. Second, a shared, purl-keyed engine consumes those slices and decides which package URLs are *reached*. The engine does not care which slicer produced the evidence: an atom slice from a Java project and a golem-derived slice from a Go project are normalized to the same shape before analysis.
 
-1. These databases are often incomplete and manually maintained.
-2. If a CVE or ADP enhancement isn’t available yet, reachability won’t be detected.
+Because reachable flows are computed independently of vulnerability databases, dep-scan avoids a common failure mode of reachability tools that rely on a manually maintained database of affected modules. When a CVE lands in the advisory feed, dep-scan simply intersects it with the already-computed reachable set. The concepts behind this design, including the distinction between `direct_purls` and `reached_purls`, are developed in the [reachability model](concepts/reachability-model) chapter.
 
-In contrast, depscan computes reachable flows (via atom) without relying on vulnerability data upfront. It then identifies a smaller subset of those flows that are actually vulnerable. From there, we can further narrow it down to flows that are Endpoint-Reachable, Exploitable, Container-Escapable, etc.
+## The analyzer matrix
 
-## Getting started
+Three analyzers are selectable with `--reachability-analyzer`:
 
-Simply invoke depscan with the `research` profile and language type to enable this feature.
+| Value                    | What it computes                                                       | When to use it                                                       |
+|--------------------------|------------------------------------------------------------------------|----------------------------------------------------------------------|
+| `FrameworkReachability`  | Framework-forward reachability from BOM occurrences plus slice purls.  | Default. Fast, language-agnostic, answers "is the package called."   |
+| `SemanticReachability`   | Adds endpoint, service, and post-build (binary/container) reachability. | Compliance-grade triage; multi-BOM lifecycle analysis.              |
+| `off`                    | Disables reachability; produces a version-based scan only.             | When slicing tooling is unavailable or a quick scan is enough.       |
 
-To receive a verbose output including the reachable flows, pass the argument `--explain`
+Every reachability-capable language runs `FrameworkReachability` by default. The two analyzers are compared in depth in the Analyzers category: [Framework reachability](analyzers/framework-reachability) and [Semantic reachability](analyzers/semantic-reachability).
 
-```shell
---profile research -t language [--explain]
-```
+## Language coverage
 
-## Example analysis for a Java project
+dep-scan reaches seven language ecosystems through four slicers. The full matrix, including purl types and BOM-generation paths, lives on the [Supported languages](supported-languages) page. In summary:
 
-```shell
-depscan --profile research -t java -i <source directory> --reports-dir <reports directory> --explain
-```
+- atom backs Java/JVM, JavaScript/TypeScript, Python, and PHP. See [JVM, JS, Python, and PHP reachability](languages/jvm-js-python-php-reachability).
+- rusi backs Rust. See [Rust reachability](languages/rust-reachability).
+- golem backs Go. See [Go reachability](languages/go-reachability).
+- dosai backs .NET. See [.NET reachability](languages/dotnet-reachability).
 
-## Example analysis for a JavaScript project
+Each language chapter demonstrates a reachable finding and a present-but-unreachable dependency from the hermetic fixture projects under `test/data/`, so you can reproduce the contrast offline.
 
-```shell
-depscan --profile research -t js -i <source directory> --reports-dir <reports directory> --explain
-```
+## Turning reachability on
 
-## Example analysis for a PHP project
-
-Ensure PHP > 7.4 is installed. However, we support scanning PHP 5.2 - 8.3. Alternatively, use the depscan container image.
+The documented way to enable reachability is the `research` profile, which configures cdxgen to persist the per-language slice files the engine needs:
 
 ```shell
-depscan --profile research -t php -i <source directory> --reports-dir <reports directory> --explain
+depscan --profile research -t <language> -i <source directory> --reports-dir <reports directory> --explain
 ```
 
-## Customize the Reachability Analyzer
+Reachability is on by default for every supported language once the slices are present, so the explicit `--reachability-analyzer` flag is only needed when you want `SemanticReachability` or `off`. The `--explain` flag adds a human-readable breakdown of the reachable flows to the report.
 
-depscan supports two different reachability analyzers with `FrameworkReachability` being the default:
+## From reachability to prioritization and compliance
 
-- **FrameworkReachability**: The Framework-Forward Reachability (FFR) algorithm computes reachability by identifying sources or entry points originating from framework-provided inputs or routes that reach a library sink.
-- **SemanticReachability**: The Semantic Reachability algorithm builds on Framework-Forward Reachability by incorporating endpoint and service information to better prioritize vulnerabilities.
+Reachability feeds two downstream outputs that matter to analysts and compliance teams. First, the prioritization engine tags reachable (and especially endpoint-reachable or malicious-and-reachable) findings with the CycloneDX property `depscan:prioritized` and surfaces them in the Top Priority table; see [How dep-scan prioritizes](concepts/prioritization). Second, the VEX exporter maps reachability to machine-readable status: reachable dependencies become `known_affected`, while present-but-unreachable dependencies become `known_not_affected` carrying the `vulnerable_code_not_in_execute_path` justification. That mapping is the core of the [CSAF VEX guide](output/vex-csaf-guide) and is the strongest argument for investing in reachability when you produce compliance artifacts.
 
-Pass the argument `--reachability-analyzer SemanticReachability` to use the Semantic Reachability analyzer.
+## Read order
 
-SemanticReachability achieves optimal results when supplemented with comprehensive data, including BOM files from multiple project types, various life cycle stages, container SBOMs, atom slices (reachables and usages), and openapi specification files. Since depscan cannot automatically generate all required BOMs (aka formulation problem), it is recommended to build the project and container images, **manually generate** the necessary BOM files, and then execute depscan using the `--bom-dir` argument.
-
-**Things to consider:**
-
-- Ensure the BOM files correspond to the same version of the source code. Mixing versions may lead to unexpected results, such as duplicate-looking component names.
-- When the application or service uses a single container image, set the `DEPSCAN_SOURCE_IMAGE` environment variable to enable depscan to automatically generate the container BOM during lifecycle analysis or semantic reachability analysis.
-- When multiple container images are involved, such as in a docker-compose setup, follow these steps:
-	1.	Run `docker compose build`.
-	2.	Manually generate BOMs for each container image, saving them with unique filenames ending in .cdx.json, and place them in a single directory. Example: `cdxgen -t docker -o reports/sbom-container1.cdx.json image_name`
-	3.	Run depscan with the --bom-dir argument pointing to that directory. Example: `--bom-dir reports --reports-dir reports`
-- Semantic analysis (computing the atom slices) is resource-intensive. For larger codebases, allocate over 64GB of memory and expect runtimes of 15 minutes or more.
-
-Sample semantic analysis reports, including the BOM and slices dataset, are available in this Hugging Face [repository](https://huggingface.co/datasets/AppThreat/ukaina/tree/main).
-
-### Example semantic reachability analysis for a Java project
-
-```shell
-depscan -t java -i <source directory> --reports-dir <reports directory> --reachability-analyzer SemanticReachability --explain
-```
-
-### Example semantic reachability analysis for a JavaScript project
-
-```shell
-depscan -t js -i <source directory> --reports-dir <reports directory> --reachability-analyzer SemanticReachability --explain
-```
-
-### Example semantic reachability analysis for an existing BOM directory (Recommended)
-
-```shell
-depscan --bom-dir <bom directory> --reports-dir <reports directory> --reachability-analyzer SemanticReachability --explain
-```
-
-This is the recommended invocation style for a thorough semantic analysis.
-
-## Explainability
-
-Pass the --explain argument to get a detailed explanation of the analysis performed by depscan.
-
-### Explanation Mode
-
-When SemanticReachability is enabled and the `--explanation-mode` argument is provided, the explanation style can be customized. depscan supports the following explanation styles:
-
-1.	**Endpoints** – Lists all HTTP endpoints, their methods, and code hotspots detected through static analysis.
-2.	**EndpointsAndReachables** – Includes endpoints along with a selection of up to 20 reachable data flows, providing detailed explanations. This is the default.
-3.	**NonReachables** – Highlights up to 20 non-reachable data flows, useful for showcasing areas where validation and sanitization are properly implemented.
-4.  **LLMPrompts** - Generates prompt text for use with LLMs for code fix suggestions.
-
-```shell
-depscan --bom-dir <bom directory> --reports-dir <reports directory> --reachability-analyzer SemanticReachability --explain --explanation-mode NonReachables
-```
-
-Use the environment variable `MAX_REACHABLE_EXPLANATIONS` to customize the number of data-flow explanations.
-
-## Troubleshooting
-
-### atom file or slices are not generated under the reports directory
-
-Generating atom (intermediate representation) and performing static slicing for reachability and usages is a memory-intensive operation. For large projects, memory upwards of 32GB is the minimum. For example, for DejaCode (a Python application), we need a minimum of 40GB RAM. In resource-constrained environments, atom might crash with the log messages usually suppressed unless depscan is invoked with the environment variable `SCAN_DEBUG_MODE=debug`.
-
-To troubleshoot step by step, try generating the atom file directly using the instructions from the atom [documentation](https://atom-docs.appthreat.dev/).
-
-### No reachable flows were identified
-
-Computing reachable flows using atom requires an accurate SBOM generated by cdxgen with certain arguments. These are typically `--profile research` or `--deep` depending on the project type. For some project types such as Python or JavaScript, additional semantic tags may be required to correctly identify reachable flows. Look for files matching the pattern `*-reachables.slices.json` in the reports directory. If the file is empty or small, then no reachable flows were identified. In certain cases, there could be a file with contents that lack any value for the "purls" attribute. This usually indicates that the SBOM was lacking suitable information for PURL identification.
-
-Consider starting a discussion or filing a bug if the issue could be reproduced with a public project.
-
-### Container SBOMs were not generated
-
-For simple container scans, pass the image name via the `--src` argument. For lifecycle or semantic reachability analysis, use `--src` to pass the source directory and pass the container image name using the environment variable `DEPSCAN_SOURCE_IMAGE`.
-
-### Post-build binary SBOMs were not generated
-
-Ensure the application is first built, since depscan cannot automatically build arbitrary projects and container images. To customize the build directory, use the environment variable `DEPSCAN_BUILD_DIR`.
-
-```shell
-pip install owasp-depscan[all]
-```
-
-Alternatively, use the official depscan container image.
-
-```shell
-docker pull ghcr.io/owasp-dep-scan/dep-scan
-# podman pull ghcr.io/owasp-dep-scan/dep-scan
-```
+If you are working through this documentation set for the first time, the recommended order is the [reachability model](concepts/reachability-model), then [prioritization](concepts/prioritization), then [SBOM and evidence](concepts/sbom-and-evidence), then the guide for your language, then the output chapter that matches your role (VDR for analysts, VEX for compliance).

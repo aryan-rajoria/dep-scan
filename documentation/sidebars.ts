@@ -20,6 +20,45 @@ const sidebars: SidebarsConfig = {
     'server-usage',
     'reachability-analysis',
     'supported-languages',
+    {
+      type: 'category',
+      collapsible: true,
+      label: 'Reachability Concepts',
+      items: [
+        'concepts/reachability-model',
+        'concepts/prioritization',
+        'concepts/sbom-and-evidence'
+      ]
+    },
+    {
+      type: 'category',
+      collapsible: true,
+      label: 'Language Guides',
+      items: [
+        'languages/rust-reachability',
+        'languages/go-reachability',
+        'languages/dotnet-reachability',
+        'languages/jvm-js-python-php-reachability'
+      ]
+    },
+    {
+      type: 'category',
+      collapsible: true,
+      label: 'Analyzers',
+      items: [
+        'analyzers/framework-reachability',
+        'analyzers/semantic-reachability'
+      ]
+    },
+    {
+      type: 'category',
+      collapsible: true,
+      label: 'Reports and Compliance',
+      items: [
+        'output/vdr-guide',
+        'output/vex-csaf-guide'
+      ]
+    },
     'env-var',
     'adv-usage',
     'migrate-v5-to-v6',

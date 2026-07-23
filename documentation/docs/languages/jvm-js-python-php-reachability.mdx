@@ -1,0 +1,103 @@
+---
+title: JVM, JS, Python, and PHP reachability (atom)
+---
+
+# JVM, JavaScript, Python, and PHP reachability with atom
+
+## Learning objective
+
+After this chapter you will be able to run dep-scan reachability on Java, JavaScript/TypeScript, Python, and PHP projects, explain how the single atom slicer covers all four ecosystems, and choose between the default `FrameworkReachability` workflow and the heavier `SemanticReachability` workflow. You will also know where to go for the deeper, project-specific walkthroughs the existing lessons provide.
+
+## What atom is and which languages it covers
+
+[atom](https://github.com/AppThreat/atom) is the slicer dep-scan uses for the four ecosystems that started the reachability feature: Java and the wider JVM (Groovy, Kotlin, Scala), JavaScript and TypeScript, Python, and PHP. atom builds a language-agnostic intermediate representation, performs static slicing for reachability and usages, and emits the `*-reachables.slices.json` files the shared engine consumes. Because one slicer covers four languages, they behave consistently and accept the same workflow, which is why they are covered in a single chapter. The native slicers for Rust (rusi), Go (golem), and .NET (dosai) are separate and have their own chapters; from the engine's point of view all four slicers produce the same purl-keyed slice shape.
+
+## Prerequisites
+
+The prerequisites are per-language because atom loads and slices real source.
+
+- Java projects need a JDK (21 or newer for large modern projects) plus Maven or Gradle, so dependencies resolve and the BOM carries versioned `pkg:maven` purls.
+- JavaScript and TypeScript projects need Node.js (20 or newer recommended) and a lockfile or installed `node_modules`.
+- Python projects need Python 3.10 or newer; cdxgen resolves `pkg:pypi` purls from requirements, Poetry, uv, and Pipfile inputs.
+- PHP projects need PHP 7.4 or newer installed locally, though dep-scan supports scanning PHP 5.2 through 8.3. Alternatively, use the dep-scan container image, which carries the PHP runtime.
+
+Across all four, you need cdxgen and dep-scan (`npm install -g @cyclonedx/cdxgen` and `pip install owasp-depscan`), and the `--profile research` setting so cdxgen persists the atom slices.
+
+## Turning reachability on
+
+The documented way to enable atom reachability is the `research` profile, which configures cdxgen to generate the atom intermediate representation and persist the `deps`, `usages`, `data-flow`, `reachables`, and `semantics` slice files. Reachability is then on by default (`FrameworkReachability`), and `--explain` adds the human-readable flow breakdown to the report.
+
+```shell
+# Java / JVM
+depscan --profile research -t java -i <source directory> --reports-dir <reports directory> --explain
+
+# JavaScript / TypeScript
+depscan --profile research -t js -i <source directory> --reports-dir <reports directory> --explain
+
+# Python
+depscan --profile research -t python -i <source directory> --reports-dir <reports directory> --explain
+
+# PHP (ensure PHP >= 7.4 is installed, or use the container image)
+depscan --profile research -t php -i <source directory> --reports-dir <reports directory> --explain
+```
+
+For some project types, notably Docker images and OS packages, add `--deep` so cdxgen digs into the layers that carry the real dependencies. When you already have a BOM and only want dep-scan to analyze it, pass `--bom <path>` instead of `-i`, but remember that reachability still needs the slice files alongside the BOM.
+
+## Analysis walkthrough: reachable versus present
+
+The atom flow shape is the same one the native slicers are normalized to. Each flow object carries a `purls` array, and a purl lands in `reached_purls` when it sits on a flow atom traced from a real entry point. The `direct_purls` set comes from `component.evidence.occurrences` on the BOM, so a component with occurrences is imported in source while a component without them is merely declared. These two sets drive the same prioritization described in [How dep-scan prioritizes](../concepts/prioritization): a reachable finding earns `depscan:prioritized` and a Reachable insight, while a present-but-unreachable finding keeps `depscan:prioritized=false`.
+
+The committed `test/data/reachables.slices.json` fixture is a large atom slice you can inspect to see the shape. A flow in that file looks, in essence, like a source node (an HTTP parameter, a file read, a framework entry point) connected through intermediate nodes to a sink node that carries the vulnerable package's purl in its tags. When the slicer can trace that path, the purl is reached; when the package is imported but the vulnerable function is never on a traced path, the purl stays in `direct_purls` only and the finding is not Reachable.
+
+```text
+  reachable:     entry point ─▶ ... ─▶ sink node [purl@version]
+                 flow traced   ⇒ purl lands in reached_purls  ⇒ prioritized
+
+  present only:  import [purl@version]     (no flow reaches a vulnerable call)
+                 in direct_purls only      ⇒ depscan:prioritized = false
+```
+
+For a concrete, project-scale illustration of each analyzer on a real codebase, the two existing lessons are the model. The [Java semantic analysis lesson](../Lessons/java-semantic-analysis) walks through dependency-track with `SemanticReachability`, including the build and container-image prerequisites that make the semantic tiers meaningful. The [.NET framework analysis lesson](../Lessons/dotnet-framework-analysis) shows `FrameworkReachability` on dotnet-podcasts, including how fuzzy search changes the result set and how to interpret framework-level matches. Read those alongside this chapter when you want a full project walkthrough rather than a per-flow one.
+
+## When to move to SemanticReachability
+
+`FrameworkReachability` is enough for the question analysts ask most often: is the vulnerable package actually called? Move to `SemanticReachability` when you need endpoint-level, service-level, and post-build reachability on top of that answer. The semantic analyzer maps OpenAPI `x-atom-usages` usage targets onto a component's own occurrence locations (endpoint reachability), associates service tags with the nearest purl (service reachability), and matches framework and cryptographic-asset components across lifecycle SBOMs (post-build reachability).
+
+SemanticReachability needs more inputs than FrameworkReachability can provide from a single source scan, which is called the formulation problem: dep-scan cannot automatically generate all the BOMs the semantic tiers want. The recommended workflow is to build the project and container images, manually generate the necessary BOMs (source, build, container), place them in a single directory, and run dep-scan against that directory with `--bom-dir`.
+
+```shell
+# Recommended semantic workflow: analyze a directory of lifecycle BOMs
+depscan --bom-dir <bom directory> --reports-dir <reports directory> --reachability-analyzer SemanticReachability --explain
+```
+
+For a single container image, set `DEPSCAN_SOURCE_IMAGE` so dep-scan can generate the container BOM automatically. For multiple images, such as a docker-compose setup, build the images, generate a `.cdx.json` BOM for each with `cdxgen -t docker -o reports/<name>.cdx.json <image>`, collect them in one directory, and point `--bom-dir` at it. Ensure the BOM files all correspond to the same version of the source, because mixing versions produces duplicate-looking component names. Semantic analysis, including computing the atom slices, is resource-intensive: for larger codebases allocate over 64GB of memory and expect runtimes of 15 minutes or more. The full trade-offs are developed in the [Semantic reachability](../analyzers/semantic-reachability) chapter.
+
+## Customizing the explanation
+
+When `SemanticReachability` is enabled, `--explanation-mode` selects what the `--explain` report emphasizes. The values are:
+
+- `Endpoints`: lists HTTP endpoints, their methods, and code hotspots detected through static analysis.
+- `EndpointsAndReachables`: endpoints plus up to twenty reachable data flows (the default).
+- `NonReachables`: up to twenty non-reachable data flows, useful for showing where validation and sanitization are properly implemented.
+- `LLMPrompts`: prompt text for use with an LLM when you want code-fix suggestions.
+
+```shell
+depscan --bom-dir <bom directory> --reports-dir <reports directory> \
+  --reachability-analyzer SemanticReachability --explain --explanation-mode NonReachables
+```
+
+Use the `MAX_REACHABLE_EXPLANATIONS` environment variable to customize the number of data-flow explanations beyond the default of twenty.
+
+## Reading the artifacts
+
+The `*-reachables.slices.json` file holds the atom slices; check here first if no finding is Reachable, because an empty or purl-less file explains the silence. The `<base>.vdr.json` (or `depscan-universal.vdr.json` for multi-BOM runs) carries the `depscan:prioritized` property and the `depscan:insights` text per vulnerability; filter the `vulnerabilities` array on those properties to reconstruct the prioritized set, as described in the [VDR guide](../output/vdr-guide). When you generate a VEX document with `--csaf`, a reached component becomes `known_affected` while a present-but-unreached component becomes `known_not_affected` carrying `vulnerable_code_not_in_execute_path`, as covered in the [CSAF VEX guide](../output/vex-csaf-guide).
+
+## Troubleshooting
+
+If the atom file or slices are not generated under the reports directory, the cause is usually memory. Generating the atom intermediate representation and performing static slicing is memory-intensive: for large projects, 32GB is a minimum, and Python applications such as DejaCode need around 40GB. atom may crash with log messages suppressed unless you invoke dep-scan with `SCAN_DEBUG_MODE=debug`. To troubleshoot step by step, try generating the atom file directly using the [atom documentation](https://atom-docs.appthreat.dev/).
+
+If no reachable flows were identified, the BOM may lack the evidence the engine needs. Computing reachable flows requires an accurate SBOM generated by cdxgen with `--profile research` or `--deep` depending on the project type. For some project types, notably Python and JavaScript, additional semantic tags may be required to identify reachable flows correctly. Look for files matching `*-reachables.slices.json` in the reports directory; if the file is empty or small, no flows were traced, and if a file exists but its flows lack a `purls` value, the BOM lacked the information needed for purl identification.
+
+## Summary
+
+atom gives the JVM, JavaScript/TypeScript, Python, and PHP ecosystems a shared reachability workflow through a single slicer, so the commands and the reading of the artifacts are consistent across all four. Start with `--profile research` and `FrameworkReachability` for fast framework-forward triage, move to `SemanticReachability` with a `--bom-dir` of lifecycle BOMs when you need endpoint, service, and post-build tiers, and read the prioritized set from the VDR or the CSAF status from the VEX. The [Java semantic analysis lesson](../Lessons/java-semantic-analysis) and the [.NET framework analysis lesson](../Lessons/dotnet-framework-analysis) offer full project walkthroughs, the [Framework reachability](../analyzers/framework-reachability) and [Semantic reachability](../analyzers/semantic-reachability) chapters explain the two analyzers in depth, and the compliance story continues in the [VDR guide](../output/vdr-guide) and [CSAF VEX guide](../output/vex-csaf-guide).
