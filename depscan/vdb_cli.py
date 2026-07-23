@@ -146,8 +146,7 @@ def cmd_download(args):
         return 1
     download_vdb_with_retries(image_url, data_dir)
     write_vdb_image_marker(image_url, data_dir)
-    LOG.info("Download complete. Variant marker written to %s",
-             vdb_image_marker_path(data_dir))
+    LOG.info("Download complete. Variant marker written to %s", vdb_image_marker_path(data_dir))
     return 0
 
 
@@ -183,8 +182,7 @@ def cmd_info(args):
     except Exception:  # noqa: BLE001
         pass
     extended_label = "yes" if meta_count and meta_count > 0 else "no"
-    print(f"Extended metadata: {extended_label}"
-          + (f" ({meta_count} rows)" if meta_count else ""))
+    print(f"Extended metadata: {extended_label}" + (f" ({meta_count} rows)" if meta_count else ""))
     return 0
 
 
@@ -199,9 +197,7 @@ def main():
     known_subcommands = ("download", "info", "path")
     raw_args = sys.argv[1:]
     # Default to "download" when no subcommand is given.
-    if not raw_args or (
-        raw_args[0].startswith("-") and raw_args[0] not in ("-h", "--help")
-    ):
+    if not raw_args or (raw_args[0].startswith("-") and raw_args[0] not in ("-h", "--help")):
         raw_args = ["download"] + raw_args
     parser = _build_parser()
     args = parser.parse_args(raw_args)

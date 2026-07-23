@@ -211,9 +211,7 @@ def _warn_large_appos_for_source_scan(scan_vdb_url, args):
     except (ValueError, IndexError):
         size_gib = 0.0
     is_source_only = (
-        not args.deep_scan
-        and os.path.isdir(str(args.src_dir_image))
-        and not args.bom_dir
+        not args.deep_scan and os.path.isdir(str(args.src_dir_image)) and not args.bom_dir
     )
     if size_gib > 10 and is_source_only:
         LOG.warning(

@@ -277,9 +277,7 @@ def test_filters_reach_search_packages_batched_not_hydration(monkeypatch):
     monkeypatch.setattr(vdb6, "get", lambda read_only=True: (None, None))
 
     filters = {"exclude_malware": True}
-    search.find_vulns_batched(
-        [{"purl": "pkg:npm/a@1.0.0", "version": "1.0.0"}], filters
-    )
+    search.find_vulns_batched([{"purl": "pkg:npm/a@1.0.0", "version": "1.0.0"}], filters)
     # filters reached pass 1
     assert batched_kwargs.get("filters") == filters
     # hydration was invoked without a filters argument (positional signature)

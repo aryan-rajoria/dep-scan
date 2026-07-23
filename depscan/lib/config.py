@@ -216,9 +216,7 @@ def resolve_vdb_image(
 
     if distro is not None:
         if distro not in _VDB_DISTROS:
-            raise ValueError(
-                f"Invalid distro '{distro}'. Use one of: {', '.join(_VDB_DISTROS)}."
-            )
+            raise ValueError(f"Invalid distro '{distro}'. Use one of: {', '.join(_VDB_DISTROS)}.")
         if scope != "app+os" or time != "default" or extended:
             raise ValueError(
                 "Distro images are mutually exclusive with scope, time, and "
