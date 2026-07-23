@@ -167,41 +167,68 @@ def vdb_download_needed(resolved_url, data_dir):
 def resolve_scan_vdb_image(args):
     """Resolve the vdb image URL for the scan path (T7 Change D).
 
-    Precedence: explicit ``VDB_DATABASE_URL`` env wins verbatim -> ``USE_VDB_10Y``
-    (maps to ``time=10y``) -> default ``(app+os, default, standard, xz)``.
+    Precedence, highest first:
 
-    When ``--severity`` is set and the user has NOT pinned an image via
-    ``VDB_DATABASE_URL``, auto-upgrade to the ``-extended`` variant and set
-    ``VDB_INCLUDE_METADATA=true`` so the severity push-down into the search
-    layer actually fires. If the user pinned a non-extended image, do not
+    1. Explicit ``VDB_DATABASE_URL`` env pin -> used verbatim.
+    2. ``--vdb-image`` (also settable via the config file as ``vdb_image``) ->
+       used verbatim.
+    3. The ``--vdb-*`` selection options (``vdb_scope``/``vdb_time``/
+       ``vdb_extended``/``vdb_compression``/``vdb_distro``), which may come from
+       the command line or be persisted in the depscan config file. Unset
+       options fall back to their defaults (app+os, default, standard, xz), and
+       ``USE_VDB_10Y`` still maps to ``time=10y`` when ``vdb_time`` is unset.
+
+    When ``--severity`` is set and the user has NOT pinned an image (env or
+    ``--vdb-image``), the ``-extended`` variant is auto-selected and
+    ``VDB_INCLUDE_METADATA=true`` is set so the severity push-down into the
+    search layer fires. If the user pinned a non-extended image, do not
     override; the depscan-side severity floor
     (``analysis_lib.utils.vuln_meets_severity``) still filters the final VDR.
 
     :return: ``(url, user_pinned)`` tuple.
     """
-    explicit = os.getenv("VDB_DATABASE_URL")
-    if explicit:
-        if args.severity and "-extended" not in explicit:
+    pinned = os.getenv("VDB_DATABASE_URL") or getattr(args, "vdb_image", None)
+    if pinned:
+        if args.severity and "-extended" not in pinned:
             LOG.info(
-                "--severity is set but VDB_DATABASE_URL points at a "
-                "non-extended image. The severity floor is still applied "
-                "to the final VDR. Use an *-extended image (or unset "
-                "VDB_DATABASE_URL) to push the filter into the search layer."
+                "--severity is set but a non-extended vdb image is pinned. The "
+                "severity floor is still applied to the final VDR. Use an "
+                "*-extended image (or clear the pin) to push the filter into "
+                "the search layer."
             )
-        return explicit, True
+        return pinned, True
 
-    scope = "app+os"
-    time_window = "10y" if os.getenv("USE_VDB_10Y", "") in ("true", "1") else "default"
-    extended = bool(args.severity)
+    distro = getattr(args, "vdb_distro", None)
+    compression = getattr(args, "vdb_compression", None) or "xz"
+    if distro:
+        # Distro images are mutually exclusive with scope/time/extended and never
+        # carry metadata, so --severity cannot push down here.
+        resolved = resolve_vdb_image(distro=distro, compression=compression)
+        if args.severity:
+            LOG.info(
+                "--severity is set but a distro-only vdb image (%s) has no "
+                "metadata; the severity floor still applies to the final VDR.",
+                resolved,
+            )
+        return resolved, False
+
+    scope = getattr(args, "vdb_scope", None) or "app+os"
+    time_window = getattr(args, "vdb_time", None)
+    if not time_window:
+        time_window = "10y" if os.getenv("USE_VDB_10Y", "") in ("true", "1") else "default"
+    extended = bool(getattr(args, "vdb_extended", None)) or bool(args.severity)
     if extended:
         os.environ["VDB_INCLUDE_METADATA"] = "true"
-        resolved = resolve_vdb_image(scope=scope, time=time_window, extended=True)
-        LOG.info(
-            "--severity needs metadata search; using the extended vdb image (%s).",
-            resolved,
+        resolved = resolve_vdb_image(
+            scope=scope, time=time_window, extended=True, compression=compression
         )
+        if args.severity:
+            LOG.info(
+                "--severity needs metadata search; using the extended vdb image (%s).",
+                resolved,
+            )
         return resolved, False
-    return resolve_vdb_image(scope=scope, time=time_window), False
+    return resolve_vdb_image(scope=scope, time=time_window, compression=compression), False
 
 
 def _warn_large_appos_for_source_scan(scan_vdb_url, args):

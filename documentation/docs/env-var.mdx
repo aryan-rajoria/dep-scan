@@ -30,6 +30,8 @@ depscan-vdb info
 
 The scan command (`depscan`) auto-downloads the database it needs. When `--severity` is set and no custom image is pinned, depscan automatically selects the extended variant so severity push-down filtering fires inside the search layer.
 
+The same selection can be set on the scan command with `--vdb-scope`, `--vdb-time`, `--vdb-extended`, `--vdb-compression`, `--vdb-distro`, and `--vdb-image`, and persisted in the depscan config file as flat keys (`vdb_scope`, `vdb_time`, `vdb_extended`, `vdb_compression`, `vdb_distro`, `vdb_image`). See the [vulnerability database guide](/vulnerability-database) for a worked config example.
+
 The environment variables below are advanced override knobs for automation and specialized deployments. In most cases the `depscan-vdb` command or the default scan behavior is sufficient.
 
 ## Environment variables

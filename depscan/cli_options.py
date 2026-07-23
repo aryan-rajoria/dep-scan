@@ -317,6 +317,61 @@ def build_parser():
         help="Report only malware advisories (MAL-*). Works on the default vdb "
         "because is_malware is always populated via the MAL- fallback.",
     )
+    vdb_group = parser.add_argument_group(
+        "vulnerability database selection",
+        "Select which published vdb image the scan downloads. These can also be "
+        "persisted in the depscan config file (e.g. vdb_scope = \"app\"). An "
+        "explicit VDB_DATABASE_URL env pin always wins. The dedicated "
+        "`depscan-vdb` command shares the same options for pre-fetching.",
+    )
+    vdb_group.add_argument(
+        "--vdb-scope",
+        choices=("app", "app+os"),
+        default=None,
+        dest="vdb_scope",
+        help="Database scope. 'app' carries only application vulnerabilities; "
+        "'app+os' adds OS distro data. Default: app+os.",
+    )
+    vdb_group.add_argument(
+        "--vdb-time",
+        choices=("2y", "default", "10y"),
+        default=None,
+        dest="vdb_time",
+        help="Time window. '2y' covers 2024+, 'default' covers 2020+, '10y' "
+        "covers 2016+. Default: default.",
+    )
+    vdb_group.add_argument(
+        "--vdb-extended",
+        action="store_true",
+        default=None,
+        dest="vdb_extended",
+        help="Download the extended variant with metadata tables populated "
+        "(needed for severity, text, alias, reference, symbol, and date search). "
+        "Auto-selected when --severity is set.",
+    )
+    vdb_group.add_argument(
+        "--vdb-compression",
+        choices=("xz", "zst"),
+        default=None,
+        dest="vdb_compression",
+        help="Compression format. 'xz' (tar.xz) is smaller; 'zst' (zstd) is "
+        "faster to decompress. Default: xz.",
+    )
+    vdb_group.add_argument(
+        "--vdb-distro",
+        choices=("alpine", "debian", "redhat", "alma", "rocky", "ubuntu"),
+        default=None,
+        dest="vdb_distro",
+        help="Use a distro-only database. Mutually exclusive with the scope, "
+        "time, and extended options.",
+    )
+    vdb_group.add_argument(
+        "--vdb-image",
+        default=None,
+        dest="vdb_image",
+        help="Override the vdb image URL verbatim (bypasses the resolver). "
+        "Equivalent to setting VDB_DATABASE_URL.",
+    )
     parser.add_argument(
         "--no-universal",
         action="store_true",
