@@ -165,6 +165,9 @@ def vdr_analyze_summarize(
     fuzzy_search=False,
     search_order=None,
     spec_version=None,
+    severity=None,
+    malware_only=False,
+    exclude_malware=False,
 ):
     """
     Method to perform VDR analysis followed by summarization.
@@ -182,6 +185,10 @@ def vdr_analyze_summarize(
             to the console.
     :param fuzzy_search: Perform fuzzy search.
     :param search_order: Search order.
+    :param severity: Minimum severity threshold (low/medium/high/critical) to
+            push down to vdb when extended metadata is available.
+    :param malware_only: Only return malware advisories.
+    :param exclude_malware: Exclude malware advisories.
 
     :return: A dict of vulnerability and severity summary statistics
     """
@@ -220,6 +227,9 @@ def vdr_analyze_summarize(
         logger=LOG,
         fuzzy_search=fuzzy_search,
         search_order=search_order,
+        severity=severity,
+        malware_only=malware_only,
+        exclude_malware=exclude_malware,
     )
     ds_version = get_version()
     vdr_result = VDRAnalyzer(vdr_options=options).process()
@@ -405,6 +415,12 @@ def run_depscan(args):
     # Are we running with a config file
     config_file_mode = args.config and os.path.exists(args.config)
     depscan_options = {**vars(args), "src_dir": src_dir, "reports_dir": reports_dir}
+    # depscan owns the malware-exclusion filter (vdb also reads this env var, but
+    # we translate it here so build_search_filters receives an explicit option).
+    depscan_options["exclude_malware"] = os.getenv("OSV_EXCLUDE_MALWARE", "") in (
+        "true",
+        "1",
+    )
     # Is the user looking for semantic analysis?
     # We can default to this when run against a BOM directory
     if (
@@ -727,6 +743,9 @@ def run_depscan(args):
             fuzzy_search=depscan_options.get("fuzzy_search", False),
             search_order=depscan_options.get("search_order"),
             spec_version=depscan_options.get("spec_version"),
+            severity=depscan_options.get("severity"),
+            malware_only=depscan_options.get("malware_only", False),
+            exclude_malware=depscan_options.get("exclude_malware", False),
         )
         if vdr_result.pkg_vulnerabilities:
             all_pkg_vulnerabilities += vdr_result.pkg_vulnerabilities

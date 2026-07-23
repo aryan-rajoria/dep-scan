@@ -36,7 +36,7 @@ usage: depscan [-h] [--config CONFIG] [--no-banner] [-i SRC_DIR_IMAGE] [-o REPOR
                [--bom-engine {auto,CdxgenGenerator,CdxgenServerGenerator,CdxgenImageBasedGenerator,BlintGenerator} |
                --vulnerability-analyzer {auto,VDRAnalyzer,LifecycleAnalyzer}] [--reachability-analyzer {off,FrameworkReachability,SemanticReachability}] [--no-suggest]
                [--risk-audit] [--cdxgen-args CDXGEN_ARGS] [--private-ns PRIVATE_NS] [-t PROJECT_TYPE [PROJECT_TYPE ...]] [--bom BOM | --bom-dir BOM_DIR | --purl SEARCH_PURL]
-               [--report-template REPORT_TEMPLATE] [--report-name REPORT_NAME] [--deep] [--fuzzy-search] [--search-order {purl,pcu,cpe,cpu,url}] [--no-universal]
+               [--report-template REPORT_TEMPLATE] [--report-name REPORT_NAME] [--deep] [--fuzzy-search] [--search-order {purl,pcu,cpe,cpu,url}] [--severity {low,medium,high,critical}] [--malware-only] [--no-universal]
                [--no-vuln-table] [--server] [--server-host SERVER_HOST] [--server-port SERVER_PORT] [--cdxgen-server CDXGEN_SERVER] [--debug] [-q | --explain] [-v]
 
 Fully open-source security and license audit for application dependencies and container images based on known vulnerabilities and advisories.
@@ -84,6 +84,9 @@ options:
   --fuzzy-search        Perform fuzzy search by creating variations of package names. Use this when the input SBOM lacks a PURL.
   --search-order {purl,pcu,cpe,cpu,url}
                         Attributes to use while searching for vulnerabilities. Default: PURL, CPE, URL (pcu).
+  --severity {low,medium,high,critical}
+                        Minimum severity threshold to report. Only advisories at or above this severity are returned. On the default (non-extended) vdb this is a safe no-op: depscan keeps its own severity gating authoritative because severity metadata may be absent. Full severity filtering requires the extended vdb, enabled with VDB_INCLUDE_METADATA=true.
+  --malware-only        Report only malware advisories (MAL-*). This works on the default vdb because the is_malware signal is always populated.
   --no-universal        Depscan would attempt to perform a single universal scan instead of individual scans per language type.
   --no-vuln-table       Do not print the table with the full list of vulnerabilities. This can help reduce console output.
   --server              Run depscan as a server

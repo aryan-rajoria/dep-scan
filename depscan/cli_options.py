@@ -299,6 +299,26 @@ def build_parser():
         help="Attributes to use while searching for vulnerabilities. Default: PURL, CPE, URL (pcu).",
     )
     parser.add_argument(
+        "--severity",
+        choices=("low", "medium", "high", "critical"),
+        default=os.getenv("DEPSCAN_SEVERITY"),
+        dest="severity",
+        help="Minimum severity threshold to report (low, medium, high, critical). "
+        "Only advisories at or above this severity are returned. "
+        "On the default (non-extended) vdb this is a safe no-op: depscan keeps "
+        "its own severity gating authoritative because severity metadata may be "
+        "absent. Full severity filtering requires the extended vdb "
+        "(VDB_INCLUDE_METADATA).",
+    )
+    parser.add_argument(
+        "--malware-only",
+        action="store_true",
+        default=False,
+        dest="malware_only",
+        help="Report only malware advisories (MAL-*). Works on the default vdb "
+        "because is_malware is always populated via the MAL- fallback.",
+    )
+    parser.add_argument(
         "--no-universal",
         action="store_true",
         default=False,
