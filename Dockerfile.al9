@@ -61,7 +61,6 @@ RUN set -e; \
     && sdk install java $JAVA_VERSION \
     && sdk install maven $MAVEN_VERSION \
     && sdk install gradle $GRADLE_VERSION \
-    && sdk offline enable \
     && mv /root/.sdkman/candidates/* /opt/ \
     && rm -rf /root/.sdkman \
     && npm install -g @cyclonedx/cdxgen @appthreat/atom-parsetools \
