@@ -320,7 +320,7 @@ def build_parser():
     vdb_group = parser.add_argument_group(
         "vulnerability database selection",
         "Select which published vdb image the scan downloads. These can also be "
-        "persisted in the depscan config file (e.g. vdb_scope = \"app\"). An "
+        'persisted in the depscan config file (e.g. vdb_scope = "app"). An '
         "explicit VDB_DATABASE_URL env pin always wins. The dedicated "
         "`depscan-vdb` command shares the same options for pre-fetching.",
     )
