@@ -52,6 +52,9 @@ class VdrAnalysisKV:
     decommission_refs: Optional[Dict] = None
     fuzzy_search: bool = False
     search_order: Optional[str] = None
+    severity: Optional[str] = None
+    exclude_malware: bool = False
+    malware_only: bool = False
 
 
 @dataclass

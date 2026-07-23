@@ -229,13 +229,17 @@ def format_system_name(system_name):
     return system_name
 
 
-def get_description_detail(data: Descriptions | str) -> Tuple[str, str]:
+def get_description_detail(data: Descriptions | str | None) -> Tuple[str, str]:
     if not data:
         return "", ""
-    if isinstance(data, Descriptions) and data.root and isinstance(data.root[0], Description):
-        data = data.root[0].value
+    if isinstance(data, Descriptions):
+        if data.root and isinstance(data.root[0], Description):
+            detail = data.root[0].value or ""
+        else:
+            detail = ""
+    else:
+        detail = data
     description = ""
-    detail = data or ""
     detail = (
         detail.replace("\\r\\n", "\n")
         .replace("\\n", "\n")
@@ -741,11 +745,10 @@ def get_cwe_list(data: ProblemTypes | None) -> List:
     cwes = []
     if not data:
         return cwes
-    data = data.root
-    for i in data:
+    for i in data.root:
         if record := i.descriptions:
             for rec in record:
-                if rec.type == "CWE":
+                if rec.type == "CWE" and rec.cweId:
                     cwes.append(int(rec.cweId.split("-")[1]))
     return cwes
 
@@ -869,7 +872,7 @@ def process_package_issue(options, vuln_occ_dict):
     package_issue = vuln_occ_dict.get("package_issue") or {}
     matched_by = vuln_occ_dict.get("matched_by") or ""
     full_pkg = vuln_occ_dict.get("affected") or package_issue.get("affected_location")
-    full_pkg = full_pkg.get("package") or ""
+    full_pkg = (full_pkg.get("package") if isinstance(full_pkg, dict) else "") or ""
     project_type_pkg = (
         f"{options.project_type}:{package_issue.get('affected_location', {}).get('package')}"
     )
@@ -1000,7 +1003,8 @@ def get_ref_summary_helper(url, patterns):
         return value, match, ""
     value, match = get_ref_summary(url, patterns["other"])
     if value == "Advisory":
-        return value, match, f"{format_system_name(match['org'])} Advisory"
+        org = match["org"] if match else ""
+        return value, match, f"{format_system_name(org)} Advisory"
     elif value == "Exploit":
         if "seclists" in lower_url:
             _, match = get_ref_summary(url, {patterns["exploits"]["seclists"]: "seclists"})
@@ -1276,7 +1280,7 @@ def process_vuln_occ(
             return counts, add_to_pkg_group_rows, vuln
         if purl_obj:
             version_used = purl_obj.get("version")
-            package_type = purl_obj.get("type")
+            package_type = purl_obj.get("type") or ""
             qualifiers = purl_obj.get("qualifiers", {})
             # Filter application CVEs from distros
             if (LANG_PKG_TYPES.get(package_type) or package_type in LANG_PKG_TYPES.values()) and (

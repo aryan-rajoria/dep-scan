@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any
 
 from analysis_lib import utils
 
@@ -149,7 +150,7 @@ def test_parse_metrics_prefers_cvss_v31_over_cvss_v30_until_v4_is_found():
 
 
 def test_refs_to_vdr_skips_malformed_references_without_crashing():
-    references = SimpleNamespace(
+    references: Any = SimpleNamespace(
         root=[
             SimpleNamespace(url=None),
             SimpleNamespace(
@@ -174,7 +175,7 @@ def test_refs_to_vdr_skips_malformed_references_without_crashing():
 
 def test_analyze_cve_vuln_handles_missing_cve_metadata_and_affected(monkeypatch):
     class DummyCVE:
-        pass
+        root: Any
 
     monkeypatch.setattr(utils, "CVE", DummyCVE)
 

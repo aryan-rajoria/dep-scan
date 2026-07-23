@@ -2,7 +2,7 @@ from vdb.lib import VulnerabilityOccurrence
 
 from analysis_lib import Counts, VdrAnalysisKV, VDRResult, XBOMAnalyzer
 from analysis_lib.output import generate_console_output, output_priority_suggestions
-from analysis_lib.search import find_vulns
+from analysis_lib.search import build_search_filters, find_vulns
 from analysis_lib.utils import (
     analyze_cve_vuln,
     dedupe_vdrs,
@@ -74,7 +74,11 @@ class VDRAnalyzer(XBOMAnalyzer):
                 options.logger.debug("The package list was empty.")
             return VDRResult(success=False, pkg_vulnerabilities=None)
         vdb_results, pkg_aliases, purl_aliases = find_vulns(
-            options.project_type, pkg_list, options.fuzzy_search, options.search_order
+            options.project_type,
+            pkg_list,
+            options.fuzzy_search,
+            options.search_order,
+            build_search_filters(options),
         )
         options.pkg_aliases = pkg_aliases
         options.purl_aliases = purl_aliases

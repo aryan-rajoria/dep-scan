@@ -14,6 +14,67 @@ from vdb.lib.search import (
 from analysis_lib.normalize import create_pkg_variations, dealias_packages, dedup
 
 
+def _extended_metadata_available() -> bool:
+    """True when vdb's extended search-metadata tables are populated.
+
+    vdb populates ``severity``/``package_scope``/date/``source`` on results only
+    when the extended metadata tables (``cve_metadata``) are present (the
+    ``*-extended`` DB). On the default DB those fields are absent, so pushing a
+    ``severity_threshold``/scope/date/source filter down would silently drop rows
+    that simply lack the metadata. depscan must therefore only push those filters
+    down when this returns True; its own Python-side logic remains authoritative
+    otherwise.
+    """
+    try:
+        from vdb.lib.search import ensure_search_metadata
+
+        return ensure_search_metadata()
+    except Exception:
+        return False
+
+
+def build_search_filters(options=None) -> Dict[str, Any]:
+    """Assemble a vdb ``filters`` dict from depscan analysis options.
+
+    vdb's search API accepts a ``filters`` dict that narrows results inside the
+    DB instead of in Python post-processing. This helper builds that dict
+    conservatively so the default DB is never silently under-reported:
+
+    - ``exclude_malware`` / ``malware_only`` are always safe to push down because
+      vdb populates ``is_malware`` on every result (via the ``MAL-`` fallback in
+      ``_attach_metadata``) even on the default DB.
+    - ``severity_threshold`` depends on the extended metadata tables and is only
+      added when ``_extended_metadata_available()`` is True. depscan keeps its own
+      severity gating authoritative otherwise.
+
+    ``options`` may be a ``VdrAnalysisKV`` (attributes) or a plain dict (the
+    depscan_options shape used in cli.py). It may be ``None`` (no filtering).
+    """
+    filters: Dict[str, Any] = {}
+    if options is None:
+        return filters
+
+    def _opt(name, default=None):
+        if hasattr(options, name):
+            return getattr(options, name, default)
+        if isinstance(options, dict):
+            return options.get(name, default)
+        return default
+
+    exclude_malware = _opt("exclude_malware", False)
+    malware_only = _opt("malware_only", False)
+    severity = _opt("severity")
+    if exclude_malware:
+        filters["exclude_malware"] = True
+    if malware_only:
+        filters["malware_only"] = True
+    # Metadata-dependent filters: only push down when the extended metadata is
+    # available, otherwise these would silently drop rows on the default DB.
+    if severity and _extended_metadata_available():
+        filters["severity_threshold"] = severity
+    return filters
+
+
 # Ecosystems whose namespace/name vdb stores in lowercase. Maven is deliberately
 # excluded (artifact IDs are case-sensitive). Golang is excluded (Go module
 # paths are case-sensitive). OS types are excluded because distro qualifiers and
@@ -161,6 +222,7 @@ def find_vulns(
     pkg_list: List[Dict[str, Any]],
     fuzzy_search: bool = False,
     search_order: Optional[str] = None,
+    filters: Optional[Dict[str, Any]] = None,
 ):
     """
     Method to search packages in our vulnerability database
@@ -169,6 +231,8 @@ def find_vulns(
     :param pkg_list: List of packages to search.
     :param fuzzy_search: Perform fuzzy search by creating variations. Disabled by default.
     :param search_order: Search order such as purl, cpe, url, cpu.
+    :param filters: Optional vdb push-down filters (see build_search_filters).
+        When None or empty, behaviour is identical to the unfiltered path.
 
     :returns: raw_results, pkg_aliases, purl_aliases
     """
@@ -193,11 +257,11 @@ def find_vulns(
     # search order; fuzzy search and a custom search_order fall back to the
     # serial path (which preserves their variation/ordering semantics).
     if not fuzzy_search and not search_order:
-        raw_results = find_vulns_batched(expanded_list)
+        raw_results = find_vulns_batched(expanded_list, filters)
     else:
         raw_results = []
         for pkg in expanded_list:
-            if res := search_expanded(pkg, fuzzy_search, search_order):
+            if res := search_expanded(pkg, fuzzy_search, search_order, filters):
                 raw_results.extend(res)
     raw_results = dedup(project_type, raw_results)
     pkg_aliases = dealias_packages(raw_results, pkg_aliases=pkg_aliases, purl_aliases=purl_aliases)
@@ -223,7 +287,9 @@ def _pkg_to_locator(pkg: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str]
     return None, ""
 
 
-def find_vulns_batched(expanded_list: List[Dict[str, Any]]) -> List:
+def find_vulns_batched(
+    expanded_list: List[Dict[str, Any]], filters: Optional[Dict[str, Any]] = None
+) -> List:
     """Batched vulnerability search using vdb's search_packages_batched.
 
     Two-pass strategy:
@@ -236,6 +302,12 @@ def find_vulns_batched(expanded_list: List[Dict[str, Any]]) -> List:
     avoiding a redundant index query. When custom data is present, each matched
     purl is re-searched with ``with_data=True`` so DB + overlay results are
     merged correctly.
+
+    ``filters`` is applied only in pass 1 (``search_packages_batched`` and the
+    custom-data ``search_by_purl_like``). Pass 2's ``get_cve_data_batched`` does
+    not accept filters (verified against vdb), so pass 1 must narrow the index
+    hits and pass 2 hydrates only the already-filtered set. When ``filters`` is
+    None/empty, behaviour is identical to the unfiltered path.
 
     The versionless-purl skip (#465) is preserved: components that carry a
     purl but no version are not searched.
@@ -260,10 +332,14 @@ def find_vulns_batched(expanded_list: List[Dict[str, Any]]) -> List:
     if not locators:
         return []
 
-    # Pass 1: identify matched locators without paying hydration cost
+    # Pass 1: identify matched locators without paying hydration cost. Filters
+    # are pushed down here so the index hits (and result_count) already reflect
+    # the narrowed set.
     hits_by_term: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     matched_terms: List[str] = []
-    for batch in search_packages_batched(locators, batch_size=50, with_data=False):
+    for batch in search_packages_batched(
+        locators, batch_size=50, with_data=False, filters=filters
+    ):
         for summary in batch:
             if summary.get("result_count", 0) > 0:
                 term = summary["locator"].get("purl") or summary["locator"].get("cpe") or ""
@@ -282,10 +358,11 @@ def find_vulns_batched(expanded_list: List[Dict[str, Any]]) -> List:
         if has_custom:
             # Custom overlay may add or override results; re-search this term
             # with full data so DB + custom are merged by search_by_purl_like.
-            results = list(search_by_purl_like(term, with_data=True))
+            results = list(search_by_purl_like(term, with_data=True, filters=filters))
         else:
             # Direct hydration of the index hits from pass 1 — avoids
-            # re-querying the cve_index for matched components.
+            # re-querying the cve_index for matched components. get_cve_data_batched
+            # takes no filters (verified); pass 1 already narrowed the hits.
             results = list(get_cve_data_batched(db_conn, hits, term))
         _restore_matched_by(results, term, original)
         raw_results.extend(results)
@@ -301,7 +378,12 @@ def _restore_matched_by(results, canonical_term, original_term):
             r["matched_by"] = original_term
 
 
-def search_expanded(pkg: Dict, fuzzy_search, search_order) -> List:
+def search_expanded(
+    pkg: Dict,
+    fuzzy_search,
+    search_order,
+    filters: Optional[Dict[str, Any]] = None,
+) -> List:
     """Searches packages and variations"""
     raw_results = []
     # Default search order is purl or cpe or url (pcu)
@@ -334,7 +416,7 @@ def search_expanded(pkg: Dict, fuzzy_search, search_order) -> List:
     if not fuzzy_search and search_term and pkg.get("purl") and not pkg.get("version"):
         return raw_results
     # Give preference to our search logic
-    if search_term and (res := search_logic(search_term, with_data=True)):
+    if search_term and (res := search_logic(search_term, with_data=True, filters=filters)):
         _restore_matched_by(res, search_term, original_purl)
         raw_results.extend(res)
     elif fuzzy_search:
@@ -346,7 +428,7 @@ def search_expanded(pkg: Dict, fuzzy_search, search_order) -> List:
         )
         if pkg.get("version"):
             alt_search_term = f"{alt_search_term}@{pkg.get('version')}"
-        if res := search_logic(alt_search_term, with_data=True):
+        if res := search_logic(alt_search_term, with_data=True, filters=filters):
             raw_results.extend(res)
     return raw_results
 
