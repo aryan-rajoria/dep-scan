@@ -338,3 +338,16 @@ RUSI_DEFAULT_CALLGRAPH_MODE = "static"
 # for atom reachables slices (set_slices_args in xbom_lib/cdxgen.py) so the
 # glob-based discovery in ReachabilityAnalysisKV picks it up unchanged.
 RUSI_REACHABLES_SLICE_FILE = "rust-reachables.slices.json"
+
+# --- golem (Go Source Inspector) reachability ----------------------------
+# env override for the golem binary path. Mirrors GOLEM_BINARY_ENV in
+# xbom_lib/golem.py; duplicated here so the CLI/config layer is standalone.
+GOLEM_BINARY_ENV = "DEPSCAN_GOLEM_BINARY"
+# golem reports are detected by structural SHAPE (callGraph/dataFlow +
+# tool/runtime), not a schemaVersion prefix -- see analysis_lib.golem_slices.
+GOLEM_DEFAULT_CALLGRAPH_MODE = "static"
+GOLEM_DEFAULT_DATAFLOW_MODE = "all"
+# Slice file dep-scan writes for go projects. Matches the name cdxgen uses
+# for atom reachables slices (set_slices_args in xbom_lib/cdxgen.py) so the
+# glob-based discovery in ReachabilityAnalysisKV picks it up unchanged.
+GOLEM_REACHABLES_SLICE_FILE = "go-reachables.slices.json"

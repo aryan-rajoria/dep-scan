@@ -10,6 +10,7 @@ OWASP dep-scan is a next-generation security and risk audit tool based on known 
 
 - [Features](#features)
     - [Rust reachability (via rusi)](#rust-reachability-via-rusi)
+    - [Go reachability (via golem)](#go-reachability-via-golem)
     - [Vulnerability Data sources](#vulnerability-data-sources)
     - [Linux distros](#linux-distros)
 - [Quick Start](#quick-start)
@@ -70,6 +71,29 @@ DEPSCAN_RUSI_BINARY=/path/to/rusi depscan -i ./my-rust-app -o ./reports
 **Locating the rusi binary.** dep-scan resolves rusi the same way cdxgen does: the `RUSI_CMD` env var, then `DEPSCAN_RUSI_BINARY`, then `rusi` on `PATH`, then the bundled `cdxgen-plugins-bin` layout (`<pluginsDir>/rusi/rusi-<platform>-<arch>`). When cdxgen spawns, dep-scan propagates `RUSI_CMD` and `CDXGEN_PLUGINS_DIR` to the subprocess so both sides use the same binary. If rusi cannot be found, Rust reachability is skipped with a warning (never a crash); other languages are unaffected.
 
 **Backend safety.** The default `stable` backend is syn-based parsing only and is safe on untrusted repositories. The `compiler` backend embeds nightly rustc and builds the target (runs `cargo`/`rustc`), so it is enabled only via explicit opt-in such as `--deep` or `--rust-analyzer-backend compiler`; consult the rusi threat model before pointing it at untrusted code.
+
+### Go reachability (via golem)
+
+Go reachability is powered by [golem (Go Source Inspector)](https://github.com/cdxgen/cdxgen-plugins-bin) — a Go static-analysis engine shipped prebuilt via cdxgen-plugins-bin. golem emits a call graph, interprocedural source→sink data-flow slices, API endpoints, and symbol-usage evidence with PURL attribution. dep-scan converts that report into its existing purl-keyed reachability pipeline, so a vulnerable module that is actually **called** (e.g. `pgx.Connect` for a SQL-injection CVE) is marked **Reachable** while a module that is merely present in the BOM but never called is not.
+
+**How it runs.** dep-scan invokes golem directly when a Go project is detected (`-t go`) and reachability is on. golem requires a local Go toolchain (`go` on `PATH`) to load packages. The `--include-all-flows` flag is always passed so dependency-internal flows (the CVE-reachability signal) are retained.
+
+**Enabling it.** Reachability is on by default for Go (`--reachability-analyzer FrameworkReachability`); `SemanticReachability` additionally attributes reached services and endpoints.
+
+```bash
+# go reachability is automatic; just scan the project
+depscan -i ./my-go-app -o ./reports -t go
+
+# point dep-scan at a specific golem binary
+DEPSCAN_GOLEM_BINARY=/path/to/golem depscan -i ./my-go-app -o ./reports -t go
+
+# forbid network access during analysis (requires warm module cache)
+depscan -i ./my-go-app -o ./reports -t go --go-analyzer-network offline
+```
+
+**Locating the golem binary.** dep-scan resolves golem the same way cdxgen does: the `GOLEM_CMD` env var, then `DEPSCAN_GOLEM_BINARY`, then `golem` on `PATH`, then the bundled `cdxgen-plugins-bin` layout (`<pluginsDir>/golem/golem-<platform>-<arch>`). When cdxgen spawns, dep-scan propagates `GOLEM_CMD` and `CDXGEN_PLUGINS_DIR` to the subprocess so both sides use the same binary. If golem or the Go toolchain cannot be found, Go reachability is skipped with a warning (never a crash); other languages are unaffected.
+
+**Safety.** golem loads packages via `golang.org/x/tools/go/packages` with full type/SSA info but does **not** run the program and does **not** run `go:generate`. Package loading uses the local Go toolchain, so module downloads can occur depending on the Go env. dep-scan defaults to `GOFLAGS=-mod=readonly` to prevent `go.mod` rewrites on untrusted repos. Use `--go-analyzer-network offline` (sets `GOPROXY=off`) to forbid all downloads; this requires a warm module cache (`GOMODCACHE`).
 
 ### Clear insights about CVEs
 

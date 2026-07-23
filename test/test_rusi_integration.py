@@ -343,6 +343,25 @@ def test_rusi_reachability_noop_when_reachability_off(tmp_path, rusi_env):
     assert result is False
 
 
+def test_rusi_reachability_accepts_cargo_alias(tmp_path, rusi_env):
+    """The ``cargo``/``crates`` project-type aliases must trigger rusi just like
+    the canonical ``rust`` token, so an alternate label never silently skips
+    Rust reachability."""
+    bom_file = tmp_path / "sbom-rust.cdx.json"
+    _write_cargo_bom(bom_file, "reachable-app")
+    src = RUSI_REPOS / "reachable-app"
+    ok = run_rusi_reachability(
+        str(bom_file),
+        str(src),
+        options={
+            "project_type": ["cargo"],
+            "reachability_analyzer": "FrameworkReachability",
+        },
+    )
+    assert ok, "rusi reachability should run for the 'cargo' project-type alias"
+    assert (tmp_path / "rust-reachables.slices.json").exists()
+
+
 # ---------------------------------------------------------------------------
 # smoke test against rusi's own vulnerable-web-app fixture
 # ---------------------------------------------------------------------------
@@ -561,9 +580,7 @@ def test_rustsec_exploitable_insight_gated_on_reached_purls():
     from analysis_lib.utils import analyze_cve_vuln
     from vdb.lib.cve_model import CVE
 
-    cve_model = CVE.model_validate(
-        json.loads(RUSTSEC_TIME_VULN.read_text(encoding="utf-8"))
-    )
+    cve_model = CVE.model_validate(json.loads(RUSTSEC_TIME_VULN.read_text(encoding="utf-8")))
 
     def _counts():
         return SimpleNamespace(
@@ -638,8 +655,7 @@ def test_rustsec_exploitable_insight_gated_on_reached_purls():
         if p.get("name") == "depscan:insights"
     ]
     assert not any("Reachable" in i for i in insights_unreached), (
-        f"a present-but-uncalled crate MUST NOT be Reachable; got "
-        f"{insights_unreached}"
+        f"a present-but-uncalled crate MUST NOT be Reachable; got {insights_unreached}"
     )
 
 
@@ -692,9 +708,7 @@ def test_cdxgen_to_depscan_rustsec_app_end_to_end(tmp_path, rusi_env):
     cannot complete (e.g. cargo cannot resolve deps offline).
     """
     if not CDXGEN_CMD:
-        pytest.skip(
-            "cdxgen not found (set DEPSCAN_CDXGEN_CMD or put cdxgen on PATH)"
-        )
+        pytest.skip("cdxgen not found (set DEPSCAN_CDXGEN_CMD or put cdxgen on PATH)")
     assert RUSI_BIN, "rusi binary must be resolved (module skip should guard this)"
     src = str(RUSTSEC_APP)
     if not Path(src).is_dir():
@@ -729,9 +743,7 @@ def test_cdxgen_to_depscan_rustsec_app_end_to_end(tmp_path, rusi_env):
         check=False,
     )
     if cp.returncode != 0 or not bom_file.exists():
-        pytest.skip(
-            f"cdxgen did not produce a BOM (rc={cp.returncode}); skipping e2e"
-        )
+        pytest.skip(f"cdxgen did not produce a BOM (rc={cp.returncode}); skipping e2e")
 
     # cdxgen must persist the raw rusi report to the semantics-slices path.
     assert semantics_file.exists(), (
@@ -793,13 +805,9 @@ def test_cdxgen_to_depscan_rustsec_app_end_to_end(tmp_path, rusi_env):
     )
     vres = VDRAnalyzer(vdr_options=vopts).process()
     vulns = vres.pkg_vulnerabilities or []
-    time_vuln = next(
-        (v for v in vulns if v.get("id") == "RUSTSEC-2020-0071"), None
-    )
+    time_vuln = next((v for v in vulns if v.get("id") == "RUSTSEC-2020-0071"), None)
     if not time_vuln:
-        pytest.skip(
-            "vdb has no RUSTSEC-2020-0071 data cached; cannot assert the VDR insight"
-        )
+        pytest.skip("vdb has no RUSTSEC-2020-0071 data cached; cannot assert the VDR insight")
     affects = [a.get("ref") for a in (time_vuln.get("affects") or [])]
     assert "pkg:cargo/time@0.1.45" in affects, (
         "the VDR vulnerability must affect the versioned time purl"

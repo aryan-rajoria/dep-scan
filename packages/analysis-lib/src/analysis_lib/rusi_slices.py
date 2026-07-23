@@ -300,6 +300,10 @@ def convert_rusi_report(
          crate. This registers pure-call reachability (a crate is used but no
          taint slice runs through it), which is essential for dependency-CVE
          reachability where the vulnerable code lives inside the dependency.
+         Each flow carries an honest 2-node path: the enclosing caller function
+         (source) -> the external symbol call (sink), enriched with the atom
+         fields the explainer reads (``parentFileName``, ``label``, ``name``,
+         ``parentMethodName``, ``isExternal``).
       3. **Endpoint flows** -- one per rusi ``api_endpoints[]`` entry. The
          framework crate (axum/actix-web/rocket) is tagged with the endpoint
          service tag so SemanticReachability attributes it to
@@ -382,9 +386,11 @@ def convert_rusi_report(
 
         rule_name = sl.get("rule_name") or ""
         sink_category = sl.get("sink_category") or ""
+        node_ids_list = sl.get("node_ids", []) or []
+        last_idx = len(node_ids_list) - 1
 
         # traverse witness nodes
-        for nid in sl.get("node_ids", []) or []:
+        for idx, nid in enumerate(node_ids_list):
             n = df_nodes.get(nid) or {}
             npurl = reconcile_purl(n.get("purl", ""), bom_index)
             nm = n.get("name") or ""
@@ -403,14 +409,31 @@ def convert_rusi_report(
             # ``pkg:cargo/sqlx@<v>`` instead of the workspace app.
             tag_purl = sym_purl or npurl
             node_category = n.get("category") or (sink_category if sym_purl else "")
+            is_external = sym_purl is not None
+            # Map the analyzer node role to an atom label so the explainer
+            # (flow_to_str / flow_to_source_sink) picks a good description.
+            if is_external:
+                node_label = "CALL"
+            elif idx == 0:
+                node_label = "METHOD_PARAMETER_IN"
+            elif idx == last_idx:
+                node_label = "RETURN"
+            else:
+                node_label = "IDENTIFIER"
+            enclosing = n.get("function") or sl.get("sink_function") or ""
             flow_nodes.append(
                 {
                     "id": nid,
                     "tags": _build_node_tags(tag_purl, node_category, rule_name),
                     "code": nm,
-                    "fullName": n.get("function") or sl.get("sink_function") or "",
+                    "fullName": enclosing,
                     "lineNumber": _pos_line(pos),
                     "columnNumber": _pos_col(pos),
+                    "parentFileName": (pos or {}).get("filename", ""),
+                    "label": node_label,
+                    "name": nm,
+                    "parentMethodName": enclosing,
+                    "isExternal": is_external,
                 }
             )
 
@@ -440,19 +463,47 @@ def convert_rusi_report(
         flows.append({"flows": flow_nodes, "purls": sorted(flow_purls)})
 
     # --- 2. call-graph external-crate flows ------------------------------
+    # Each external-crate call becomes an honest 2-node flow: the enclosing
+    # caller function (source) -> the external symbol call (sink). This lets
+    # the flow pass the explainer's >= 2-node gate and renders a readable
+    # source -> sink path. The source node intentionally carries lineNumber 0
+    # so the explainer's consecutive same-loc dedup does not eat the sink node
+    # (both nodes share the same call-site file).
     for rec in external_call_records:
         callee = rec.get("callee") or ""
+        source = rec.get("source") or ""
         pos = rec.get("position") or {}
-        node = {
-            "id": "rusi-cg-"
-            + hashlib.md5((callee + "|" + rec.get("source", "")).encode("utf-8")).hexdigest()[:16],
+        parent_file = (pos or {}).get("filename", "")
+        flow_hash = hashlib.md5((callee + "|" + source).encode("utf-8")).hexdigest()[:16]
+        caller_short = source.rsplit("::", 1)[-1] if source else callee
+        callee_short = callee.rsplit("::", 1)[-1] if callee else ""
+        source_node = {
+            "id": "rusi-cg-src-" + flow_hash,
+            "tags": _build_node_tags(None, "call-graph", "call-graph"),
+            "code": source or callee,
+            "fullName": source,
+            "lineNumber": 0,
+            "columnNumber": 0,
+            "parentFileName": parent_file,
+            "label": "IDENTIFIER",
+            "name": caller_short,
+            "parentMethodName": source,
+            "isExternal": False,
+        }
+        sink_node = {
+            "id": "rusi-cg-" + flow_hash,
             "tags": _build_node_tags(rec["purl"], "call-graph", "call-graph"),
             "code": callee,
-            "fullName": rec.get("source") or "",
+            "fullName": callee,
             "lineNumber": _pos_line(pos),
             "columnNumber": _pos_col(pos),
+            "parentFileName": parent_file,
+            "label": "CALL",
+            "name": callee_short,
+            "parentMethodName": source,
+            "isExternal": True,
         }
-        flows.append({"flows": [node], "purls": [rec["purl"]]})
+        flows.append({"flows": [source_node, sink_node], "purls": [rec["purl"]]})
 
     # --- 3. api_endpoint handler flows ----------------------------------
     # Each HTTP endpoint rusi discovered becomes a flow whose purls carry the
@@ -498,6 +549,11 @@ def convert_rusi_report(
                     "fullName": handler,
                     "lineNumber": _pos_line(pos),
                     "columnNumber": _pos_col(pos),
+                    "parentFileName": (pos or {}).get("filename", ""),
+                    "label": "CALL",
+                    "name": path or handler,
+                    "parentMethodName": handler,
+                    "isExternal": True,
                 }
             )
         if handler_vpurl and handler_vpurl != fw_vpurl:
@@ -509,6 +565,11 @@ def convert_rusi_report(
                     "fullName": handler,
                     "lineNumber": _pos_line(pos),
                     "columnNumber": _pos_col(pos),
+                    "parentFileName": (pos or {}).get("filename", ""),
+                    "label": "IDENTIFIER",
+                    "name": handler.rsplit("::", 1)[-1] if handler else "",
+                    "parentMethodName": handler,
+                    "isExternal": False,
                 }
             )
         flows.append({"flows": ep_nodes, "purls": sorted(ep_purls)})
