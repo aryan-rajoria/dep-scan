@@ -1,6 +1,7 @@
 """Tests for depscan.cli helpers."""
 
 import argparse
+import os
 
 import pytest
 
@@ -93,3 +94,119 @@ def test_positive_int_env(monkeypatch):
     assert cli._positive_int_env("DS_TEST_RETRIES", 3) == 3
     monkeypatch.delenv("DS_TEST_RETRIES", raising=False)
     assert cli._positive_int_env("DS_TEST_RETRIES", 3) == 3
+
+
+# ---------------------------------------------------------------------------
+# Change C: variant marker + forced re-download on mismatch
+# ---------------------------------------------------------------------------
+
+def test_vdb_download_needed_stale(monkeypatch):
+    """needs_update=True should trigger download regardless of marker."""
+    monkeypatch.setattr(cli.db_lib, "needs_update", lambda **kw: True)
+    monkeypatch.setattr(cli, "read_vdb_image_marker", lambda d: "ghcr.io/appthreat/vdbxz:v6.7.x")
+    should, reason = cli.vdb_download_needed("ghcr.io/appthreat/vdbxz:v6.7.x", "/tmp/d")
+    assert should is True
+    assert reason == "stale"
+
+
+def test_vdb_download_needed_variant_change_forces_redownload(monkeypatch):
+    """A variant mismatch forces re-download even when the DB is fresh."""
+    monkeypatch.setattr(cli.db_lib, "needs_update", lambda **kw: False)
+    monkeypatch.setattr(cli, "read_vdb_image_marker", lambda d: "ghcr.io/appthreat/vdbxz:v6.7.x")
+    should, reason = cli.vdb_download_needed(
+        "ghcr.io/appthreat/vdbxz-extended:v6.7.x", "/tmp/d"
+    )
+    assert should is True
+    assert reason == "variant-change"
+
+
+def test_vdb_download_needed_no_download_when_fresh_and_same_variant(monkeypatch):
+    """Fresh DB with same variant should not trigger download."""
+    monkeypatch.setattr(cli.db_lib, "needs_update", lambda **kw: False)
+    monkeypatch.setattr(cli, "read_vdb_image_marker", lambda d: "ghcr.io/appthreat/vdbxz:v6.7.x")
+    should, reason = cli.vdb_download_needed("ghcr.io/appthreat/vdbxz:v6.7.x", "/tmp/d")
+    assert should is False
+    assert reason is None
+
+
+def test_vdb_download_needed_no_marker_does_not_force(monkeypatch):
+    """No marker at all (first run or pre-feature) should rely on needs_update only."""
+    monkeypatch.setattr(cli.db_lib, "needs_update", lambda **kw: False)
+    monkeypatch.setattr(cli, "read_vdb_image_marker", lambda d: None)
+    should, reason = cli.vdb_download_needed("ghcr.io/appthreat/vdbxz:v6.7.x", "/tmp/d")
+    assert should is False
+    assert reason is None
+
+
+# ---------------------------------------------------------------------------
+# Change D: scan-time resolver + auto-extended for --severity
+# ---------------------------------------------------------------------------
+
+def _make_args(severity=None, deep_scan=False, src_dir_image=".", bom_dir=None):
+    """Build a lightweight args namespace for resolve_scan_vdb_image tests."""
+    import argparse
+    return argparse.Namespace(
+        severity=severity,
+        deep_scan=deep_scan,
+        src_dir_image=src_dir_image,
+        bom_dir=bom_dir,
+    )
+
+
+def test_resolve_scan_default_no_severity(monkeypatch):
+    """No severity, no env vars -> default app+os standard xz."""
+    monkeypatch.delenv("VDB_DATABASE_URL", raising=False)
+    monkeypatch.delenv("USE_VDB_10Y", raising=False)
+    monkeypatch.delenv("VDB_INCLUDE_METADATA", raising=False)
+    args = _make_args()
+    url, pinned = cli.resolve_scan_vdb_image(args)
+    assert url == "ghcr.io/appthreat/vdbxz:v6.7.x"
+    assert pinned is False
+    assert os.getenv("VDB_INCLUDE_METADATA") is None
+
+
+def test_resolve_scan_severity_auto_extended(monkeypatch):
+    """--severity with no explicit pin -> extended image + VDB_INCLUDE_METADATA."""
+    monkeypatch.delenv("VDB_DATABASE_URL", raising=False)
+    monkeypatch.delenv("USE_VDB_10Y", raising=False)
+    monkeypatch.delenv("VDB_INCLUDE_METADATA", raising=False)
+    args = _make_args(severity="high")
+    url, pinned = cli.resolve_scan_vdb_image(args)
+    assert url == "ghcr.io/appthreat/vdbxz-extended:v6.7.x"
+    assert pinned is False
+    assert os.getenv("VDB_INCLUDE_METADATA") == "true"
+
+
+def test_resolve_scan_explicit_url_not_overridden(monkeypatch):
+    """VDB_DATABASE_URL pin is respected verbatim even with --severity."""
+    monkeypatch.setenv("VDB_DATABASE_URL", "ghcr.io/appthreat/vdbxz-app:v6.7.x")
+    monkeypatch.delenv("VDB_INCLUDE_METADATA", raising=False)
+    args = _make_args(severity="high")
+    url, pinned = cli.resolve_scan_vdb_image(args)
+    assert url == "ghcr.io/appthreat/vdbxz-app:v6.7.x"
+    assert pinned is True
+    # VDB_INCLUDE_METADATA should NOT be set by depscan for a pinned image
+    assert os.getenv("VDB_INCLUDE_METADATA") is None
+
+
+def test_resolve_scan_use_vdb_10y(monkeypatch):
+    """USE_VDB_10Y maps to time=10y."""
+    monkeypatch.delenv("VDB_DATABASE_URL", raising=False)
+    monkeypatch.setenv("USE_VDB_10Y", "true")
+    monkeypatch.delenv("VDB_INCLUDE_METADATA", raising=False)
+    args = _make_args()
+    url, pinned = cli.resolve_scan_vdb_image(args)
+    assert url == "ghcr.io/appthreat/vdbxz-10y:v6.7.x"
+    assert pinned is False
+
+
+def test_resolve_scan_use_vdb_10y_with_severity(monkeypatch):
+    """USE_VDB_10Y + --severity -> 10y extended."""
+    monkeypatch.delenv("VDB_DATABASE_URL", raising=False)
+    monkeypatch.setenv("USE_VDB_10Y", "true")
+    monkeypatch.delenv("VDB_INCLUDE_METADATA", raising=False)
+    args = _make_args(severity="critical")
+    url, pinned = cli.resolve_scan_vdb_image(args)
+    assert url == "ghcr.io/appthreat/vdbxz-10y-extended:v6.7.x"
+    assert pinned is False
+    assert os.getenv("VDB_INCLUDE_METADATA") == "true"

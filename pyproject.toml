@@ -45,6 +45,7 @@ Funding = "https://owasp.org/donate/?reponame=www-project-dep-scan&title=OWASP+d
 
 [project.scripts]
 depscan = "depscan.cli:main"
+depscan-vdb = "depscan.vdb_cli:main"
 
 [project.optional-dependencies]
 dev = [

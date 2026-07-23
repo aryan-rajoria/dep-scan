@@ -178,7 +178,7 @@ depscan allows you to customize the BOM generator engine. The supported values a
 - **auto**: Uses the container-image-based cdxgen generator (`CdxgenImageBasedGenerator`) if the Docker command is available and the project type specified is not an oci image type (such as docker, podman, and oci). Otherwise, it uses the local cdxgen CLI via `CdxgenGenerator` or the local cdxgen server `CdxgenServerGenerator` if you pass the `--cdxgen-server` argument.
 - **CdxgenGenerator**: Always uses the local cdxgen CLI. Install cdxgen using the npm command or download the standalone executable.
 - **CdxgenServerGenerator**: Uses the cdxgen server. Specify the URL using the `--cdxgen-server` argument.
-- **CdxgenImageBasedGenerator**: Generates a BOM using the official cdxgen container images. You can customize the image name using `CDXGEN_IMAGE_{project_type}` and `CDXGEN_IMAGE_VERSION`. Container image–based generation is more suitable for enterprise applications that require specific build tools and OS libraries for successful BOM generation. This approach is resource-intensive but typically has a higher success rate.
+- **CdxgenImageBasedGenerator**: Generates a BOM using the official cdxgen container images. You can customize the image name using `CDXGEN_IMAGE_{project_type}` and `CDXGEN_IMAGE_VERSION`. Container image-based generation is more suitable for enterprise applications that require specific build tools and OS libraries for successful BOM generation. This approach is resource-intensive but typically has a higher success rate.
 - **BlintGenerator**: Uses the optional OWASP [blint](https://github.com/owasp-dep-scan/blint) library. This requires installing depscan with all optional packages:
     ```bash
     pip install owasp-depscan[all]
@@ -194,10 +194,47 @@ depscan supports customizing the vulnerability analyzer engine. The supported va
 
 - **auto**: Uses LifecycleAnalyzer when invoked with a valid --bom-dir containing multiple xBOMs; otherwise, it defaults to VDRAnalyzer.
 - **VDRAnalyzer**: Mimics the analysis performed by depscan v5 by focusing on a single xBOM and a single BOM lifecycle phase.
-- **LifecycleAnalyzer**: Optimized for analyzing multiple phases of a BOM lifecycle—such as pre-build, build, post-build, and operations—to support better prioritization.
+- **LifecycleAnalyzer**: Optimized for analyzing multiple phases of a BOM lifecycle, such as pre-build, build, post-build, and operations, to support better prioritization.
 
 The `LifecycleAnalyzer` works by repeatedly invoking cdxgen (for pre-build, build, and container phases) and blint (for post-build) to generate multiple SBOMs. With this rich context, depscan can suppress more false positives and more accurately identify high-priority CVEs. Use the environment variable `DEPSCAN_SOURCE_IMAGE` to specify the image for container SBOM generation.
 
 ## Configuration File support
 
 You can pass CLI options to depscan using a configuration file with the `--config` argument. By default, depscan looks for `.config/depscan.toml` in the current directory. A sample file named `depscan.toml.sample` is also generated in the reports directory (Specified via `--reports-dir`). Customize this file as needed and copy it to the `.config` directory to run depscan without specifying arguments each time.
+
+## Vulnerability database management (depscan-vdb)
+
+The `depscan-vdb` command selects, downloads, and inspects any published vdb image variant. See the [vulnerability database guide](/vulnerability-database) for the full image matrix.
+
+```text
+usage: depscan-vdb [-h] [-v] {download,info,path} ...
+
+Select, download, and inspect any published vdb vulnerability database image
+(scope, time, extended tier, compression, distro).
+
+positional arguments:
+  {download,info,path}
+    download            Download a vdb image into VDB_HOME (default action).
+    info                Print information about the locally cached vdb.
+    path                Print the VDB_HOME directory.
+
+options:
+  -h, --help            show this help message and exit
+  -v, --version         Display the version
+```
+
+Common download flags:
+
+```bash
+# Default App+OS database
+depscan-vdb download
+
+# Smaller app-only database
+depscan-vdb download --scope app
+
+# Extended variant (for severity and metadata search)
+depscan-vdb download --scope app --extended
+
+# Distro-specific database
+depscan-vdb download --distro ubuntu
+```

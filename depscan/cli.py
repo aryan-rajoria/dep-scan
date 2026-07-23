@@ -41,8 +41,11 @@ from depscan.lib.config import (
     VDB_AGE_HOURS,
     license_data_dir,
     pkg_max_risk_score,
+    read_vdb_image_marker,
+    resolve_vdb_image,
     spdx_license_list,
-    vdb_database_url,
+    vdb_image_size,
+    write_vdb_image_marker,
 )
 from depscan.lib.license import build_license_data, bulk_lookup
 from depscan.lib.logger import DEBUG, IS_CI, LOG, SPINNER, console
@@ -120,6 +123,105 @@ def download_vdb_with_retries(vdb_database_url, data_dir, attempts=VDB_DOWNLOAD_
                 )
     if last_exc is not None:
         raise last_exc
+
+
+def vdb_download_needed(resolved_url, data_dir):
+    """Decide whether the scan should (re-)download the vdb.
+
+    The DB is re-downloaded when it is stale (time-based, via
+    ``db6.needs_update``) OR when the depscan-owned variant marker differs
+    from the freshly resolved image ref. The marker check catches a
+    scope/time/tier/distro switch that ``needs_update`` would otherwise miss
+    for up to ``VDB_AGE_HOURS`` because vdb metadata does not record the
+    source variant.
+
+    :param resolved_url: the image ref the scan resolved for this run
+    :param data_dir: the vdb data directory (``config.DATA_DIR``)
+    :return: ``(should_download, reason)`` where *reason* is ``"stale"``,
+        ``"variant-change"``, or ``None``.
+    """
+    # needs_update returns default_status when the on-disk DB has no usable
+    # metadata (a fresh install or a missing/corrupt DB). In that case we must
+    # download, so default_status is True. (The previous
+    # ``get_db_file_metadata is not None`` compared the function object, not its
+    # result, so it was always True by accident; calling it would wrongly
+    # return False on a fresh install and skip the download.)
+    stale = db_lib.needs_update(
+        days=0,
+        hours=VDB_AGE_HOURS,
+        default_status=True,
+    )
+    if stale:
+        return True, "stale"
+    marker = read_vdb_image_marker(data_dir)
+    if marker is not None and marker != resolved_url:
+        LOG.info(
+            "vdb variant changed from '%s' to '%s'; forcing re-download.",
+            marker,
+            resolved_url,
+        )
+        return True, "variant-change"
+    return False, None
+
+
+def resolve_scan_vdb_image(args):
+    """Resolve the vdb image URL for the scan path (T7 Change D).
+
+    Precedence: explicit ``VDB_DATABASE_URL`` env wins verbatim -> ``USE_VDB_10Y``
+    (maps to ``time=10y``) -> default ``(app+os, default, standard, xz)``.
+
+    When ``--severity`` is set and the user has NOT pinned an image via
+    ``VDB_DATABASE_URL``, auto-upgrade to the ``-extended`` variant and set
+    ``VDB_INCLUDE_METADATA=true`` so the severity push-down into the search
+    layer actually fires. If the user pinned a non-extended image, do not
+    override; the depscan-side severity floor
+    (``analysis_lib.utils.vuln_meets_severity``) still filters the final VDR.
+
+    :return: ``(url, user_pinned)`` tuple.
+    """
+    explicit = os.getenv("VDB_DATABASE_URL")
+    if explicit:
+        if args.severity and "-extended" not in explicit:
+            LOG.info(
+                "--severity is set but VDB_DATABASE_URL points at a "
+                "non-extended image. The severity floor is still applied "
+                "to the final VDR. Use an *-extended image (or unset "
+                "VDB_DATABASE_URL) to push the filter into the search layer."
+            )
+        return explicit, True
+
+    scope = "app+os"
+    time_window = "10y" if os.getenv("USE_VDB_10Y", "") in ("true", "1") else "default"
+    extended = bool(args.severity)
+    if extended:
+        os.environ["VDB_INCLUDE_METADATA"] = "true"
+        resolved = resolve_vdb_image(scope=scope, time=time_window, extended=True)
+        LOG.info(
+            "--severity needs metadata search; using the extended vdb image (%s).",
+            resolved,
+        )
+        return resolved, False
+    return resolve_vdb_image(scope=scope, time=time_window), False
+
+
+def _warn_large_appos_for_source_scan(scan_vdb_url, args):
+    """Advisory warning before pulling a multi-GB App+OS image on a source-only scan."""
+    try:
+        size_gib = float(vdb_image_size(scan_vdb_url).split()[0])
+    except (ValueError, IndexError):
+        size_gib = 0.0
+    is_source_only = (
+        not args.deep_scan
+        and os.path.isdir(str(args.src_dir_image))
+        and not args.bom_dir
+    )
+    if size_gib > 10 and is_source_only:
+        LOG.warning(
+            "The selected vulnerability database is large (~%s GiB "
+            "uncompressed) for a source-only scan. For faster downloads, "
+            "consider an app-only image: `depscan-vdb download --scope app`.",
+            vdb_image_size(scan_vdb_url).split()[0],
+        )
 
 
 def build_args():
@@ -429,12 +531,12 @@ def run_depscan(args):
         LOG.debug("Automatically switching to the `LifecycleAnalyzer` for vulnerability analysis.")
         depscan_options["vuln_analyzer"] = "LifecycleAnalyzer"
         args.vuln_analyzer = "LifecycleAnalyzer"
+    # Resolve the vdb image for this scan (T7 Change D).
+    scan_vdb_url, _user_pinned = resolve_scan_vdb_image(args)
+    _warn_large_appos_for_source_scan(scan_vdb_url, args)
     # Should we download the latest vdb.
-    if db_lib.needs_update(
-        days=0,
-        hours=VDB_AGE_HOURS,
-        default_status=db_lib.get_db_file_metadata is not None,
-    ):
+    should_download, dl_reason = vdb_download_needed(scan_vdb_url, config.DATA_DIR)
+    if should_download:
         if ORAS_AVAILABLE:
             with console.status(
                 f"Downloading the latest vulnerability database to {config.DATA_DIR}. Please wait ...",
@@ -445,7 +547,10 @@ def run_depscan(args):
                 # This line may exit with an exception if the database cannot be
                 # downloaded even after retries.
                 # Example: urllib3.exceptions.IncompleteRead, urllib3.exceptions.ProtocolError, requests.exceptions.ChunkedEncodingError
-                download_vdb_with_retries(vdb_database_url, config.DATA_DIR)
+                download_vdb_with_retries(scan_vdb_url, config.DATA_DIR)
+                # Record the variant so a future switch forces a re-download
+                # even when the DB is still within the age window.
+                write_vdb_image_marker(scan_vdb_url, config.DATA_DIR)
         else:
             LOG.warning(
                 "The latest vulnerability database is not found. Follow the documentation to manually download it."

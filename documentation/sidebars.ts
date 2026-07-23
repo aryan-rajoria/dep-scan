@@ -17,6 +17,7 @@ const sidebars: SidebarsConfig = {
     'dep-scan',
     'getting-started',
     'cli-usage',
+    'vulnerability-database',
     'server-usage',
     'reachability-analysis',
     'supported-languages',

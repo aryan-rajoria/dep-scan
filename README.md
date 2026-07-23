@@ -261,7 +261,7 @@ chmod +x depscan-linux-amd64
 > The macOS binaries are currently unsigned. On first run macOS Gatekeeper may block them; clear the quarantine attribute with `xattr -d com.apple.quarantine ./depscan-darwin-arm64` (or allow the binary under System Settings, Privacy & Security).
 
 > [!NOTE]
-> The vulnerability database is still downloaded on first run. Only cdxgen is bundled, not the vuln DB. Set `VDB_DATABASE_URL` (for example `ghcr.io/appthreat/vdbxz-app-2y:v6.7.x` for a smaller, recent-years-only database) to control which database is fetched.
+> The vulnerability database is still downloaded on first run. Only cdxgen is bundled, not the vuln DB. Use the `depscan-vdb` command to select a specific database variant, for example `depscan-vdb download --scope app` for a smaller app-only database. See the [vulnerability database guide](https://depscan.readthedocs.io/vulnerability-database) for the full image matrix.
 
 All standalone binaries bundle `blint`, but not its optional `nyxstone` disassembly backend (which has no wheels and no Windows support). Deep disassembly-based binary analysis is therefore unavailable in the standalone binaries; use the Python package (`pip install owasp-depscan[all]`) if you need it.
 
