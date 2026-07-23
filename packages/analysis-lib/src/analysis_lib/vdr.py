@@ -13,6 +13,7 @@ from analysis_lib.utils import (
     remove_extra_metadata,
     retrieve_bom_dependency_tree,
     retrieve_oci_properties,
+    vuln_meets_severity,
 )
 
 
@@ -174,6 +175,13 @@ class VDRAnalyzer(XBOMAnalyzer):
                 pkg_vulnerabilities, options.project_type
             )
         pkg_vulnerabilities = dedupe_vdrs(pkg_vulnerabilities)
+        # Apply depscan's own --severity floor. The vdb push-down filter only
+        # fires on the extended DB, so this gate keeps --severity meaningful on
+        # the default DB and is authoritative for the final VDR either way.
+        if options.severity:
+            pkg_vulnerabilities = [
+                v for v in pkg_vulnerabilities if vuln_meets_severity(v, options.severity)
+            ]
         # Should we print the vulnerability table
         if not options.no_vuln_table:
             pkg_group_rows, table = generate_console_output(

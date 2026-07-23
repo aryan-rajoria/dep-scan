@@ -50,6 +50,39 @@ CRITICAL_OR_HIGH = ("CRITICAL", "HIGH")
 
 JUST_CRITICAL = ("CRITICAL",)
 
+# Severity floor ranking for the --severity output filter. Higher is more
+# severe. Ratings that carry no recognised severity (unknown/none/empty) are
+# deliberately not ranked here so they are never silently dropped.
+SEVERITY_RANK = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+
+
+def vuln_meets_severity(vuln: Dict, threshold: Optional[str]) -> bool:
+    """Return True when a VDR entry clears the ``--severity`` floor.
+
+    This is depscan's own severity gating, applied to the finished VDR entries
+    regardless of which vdb the scan ran against. The vdb push-down filter is a
+    best-effort acceleration that only fires on the extended DB; this keeps
+    ``--severity`` meaningful on the default DB too.
+
+    A vuln passes when the highest ranked severity across its ``ratings`` is at
+    or above ``threshold``. Findings whose ratings carry no recognised severity
+    (unknown/none) are kept rather than dropped, so an unrated-but-possibly-
+    severe advisory is never hidden by a threshold.
+    """
+    if not threshold:
+        return True
+    floor = SEVERITY_RANK.get(str(threshold).upper())
+    if not floor:
+        return True
+    ranks = [
+        SEVERITY_RANK[sev]
+        for rating in (vuln.get("ratings") or [])
+        if (sev := str(rating.get("severity", "")).upper()) in SEVERITY_RANK
+    ]
+    if not ranks:
+        return True
+    return max(ranks) >= floor
+
 
 def is_malware_vuln(vuln: Dict) -> bool:
     """Detect a malware advisory using vdb's native ``is_malware`` signal.

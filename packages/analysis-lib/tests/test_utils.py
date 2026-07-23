@@ -69,6 +69,29 @@ def test_check_malware_cve_delegates_to_helper():
     assert check_malware_cve(None) is False
 
 
+def test_vuln_meets_severity_floor():
+    """--severity keeps findings at or above the floor and drops lower ones."""
+    crit = {"ratings": [{"severity": "CRITICAL"}]}
+    med = {"ratings": [{"severity": "MEDIUM"}]}
+    # No threshold -> everything passes
+    assert utils.vuln_meets_severity(crit, None) is True
+    assert utils.vuln_meets_severity(med, "") is True
+    # At/above floor passes, below floor drops
+    assert utils.vuln_meets_severity(crit, "high") is True
+    assert utils.vuln_meets_severity(med, "high") is False
+    assert utils.vuln_meets_severity(med, "medium") is True
+    # Highest rating across the list wins
+    mixed = {"ratings": [{"severity": "LOW"}, {"severity": "CRITICAL"}]}
+    assert utils.vuln_meets_severity(mixed, "critical") is True
+
+
+def test_vuln_meets_severity_keeps_unrated():
+    """Unrated/unknown findings are kept rather than silently hidden."""
+    assert utils.vuln_meets_severity({"ratings": []}, "high") is True
+    assert utils.vuln_meets_severity({"ratings": [{"severity": "unknown"}]}, "high") is True
+    assert utils.vuln_meets_severity({}, "critical") is True
+
+
 def test_max_version():
     ret = utils.max_version("1.0.0")
     assert ret == "1.0.0"

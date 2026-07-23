@@ -304,11 +304,10 @@ def build_parser():
         default=os.getenv("DEPSCAN_SEVERITY"),
         dest="severity",
         help="Minimum severity threshold to report (low, medium, high, critical). "
-        "Only advisories at or above this severity are returned. "
-        "On the default (non-extended) vdb this is a safe no-op: depscan keeps "
-        "its own severity gating authoritative because severity metadata may be "
-        "absent. Full severity filtering requires the extended vdb "
-        "(VDB_INCLUDE_METADATA).",
+        "Only advisories at or above this severity are returned. depscan applies "
+        "this floor to the final VDR on any database; on the extended vdb "
+        "(VDB_INCLUDE_METADATA) it is additionally pushed down into the search "
+        "for speed. Findings with no rated severity are kept.",
     )
     parser.add_argument(
         "--malware-only",
