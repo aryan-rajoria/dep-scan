@@ -5,7 +5,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import cvss
 from analysis_lib import get_all_bom_files
