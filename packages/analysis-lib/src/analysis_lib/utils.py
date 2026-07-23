@@ -51,6 +51,27 @@ CRITICAL_OR_HIGH = ("CRITICAL", "HIGH")
 JUST_CRITICAL = ("CRITICAL",)
 
 
+def is_malware_vuln(vuln: Dict) -> bool:
+    """Detect a malware advisory using vdb's native ``is_malware`` signal.
+
+    vdb's ``_attach_metadata`` populates ``is_malware`` on every hydrated result
+    when extended metadata is present, and otherwise derives it from the
+    ``MAL-`` cve_id prefix. This helper mirrors that fallback so behaviour is
+    identical on the default DB (where ``is_malware`` comes from the prefix) and
+    more accurate on the extended DB (where the metadata row is authoritative).
+
+    The input is a vulnerability dict in either shape depscan handles: a raw vdb
+    search result (carries ``cve_id`` and, when hydrated, ``is_malware``) or a
+    ``VulnerabilityOccurrence.to_dict()`` (carries ``id``). When the
+    ``is_malware`` key is absent we fall back to a prefix match on whichever id
+    field is present.
+    """
+    if "is_malware" in vuln:
+        return bool(vuln.get("is_malware"))
+    vid = str(vuln.get("cve_id") or vuln.get("id") or "")
+    return vid.startswith("MAL-")
+
+
 def distro_package(cpe):
     """
     Determines if a given Common Platform Enumeration (CPE) belongs to an
@@ -1157,7 +1178,7 @@ def process_vuln_occ(
     insights = []
     plain_insights = []
     pkg_severity = vuln_occ_dict.get("severity") or "unknown"
-    if vid.startswith("MAL-"):
+    if is_malware_vuln(vuln_occ_dict):
         insights.append("[bright_red]:stop_sign: Malicious[/bright_red]")
         plain_insights.append("Malicious")
         counts.malicious_count += 1
@@ -1242,14 +1263,14 @@ def process_vuln_occ(
                 counts.fp_count += 1
                 return counts, add_to_pkg_group_rows, vuln
         # Issue #320 - Malware matches without purl are false positives
-        if vid.startswith("MAL-"):
+        if is_malware_vuln(vuln_occ_dict):
             counts.fp_count += 1
             counts.malicious_count -= 1
             return counts, add_to_pkg_group_rows, vuln
     else:
         purl_obj = parse_purl(purl)
         # Issue #320 - Malware matches without purl are false positives
-        if not purl_obj and vid.startswith("MAL-"):
+        if not purl_obj and is_malware_vuln(vuln_occ_dict):
             counts.fp_count += 1
             counts.malicious_count -= 1
             return counts, add_to_pkg_group_rows, vuln
@@ -1502,7 +1523,7 @@ def analyze_cve_vuln(
     vid = vid.strip()
     if not re.match(r"^[A-Za-z0-9\-]+$", vid):
         vid = re.sub(r"[^A-Za-z0-9\-]", "", vid)
-    if vid.startswith("MAL-"):
+    if is_malware_vuln(vuln):
         insights.append("[bright_red]:stop_sign: Malicious[/bright_red]")
         plain_insights.append("Malicious")
         counts.malicious_count += 1

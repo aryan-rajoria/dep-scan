@@ -244,8 +244,14 @@ def generate_console_output(
 def check_malware_cve(cve_list):
     if not cve_list:
         return False
+    # Delegate to the single malware predicate in utils so the MAL- prefix
+    # fallback lives in one place. cve_list carries bare id strings, so each is
+    # wrapped in a minimal dict to let is_malware_vuln apply its fallback path.
+    # Local import avoids a circular import (utils imports from this module).
+    from analysis_lib.utils import is_malware_vuln
+
     for c in cve_list:
-        if c.startswith("MAL-"):
+        if is_malware_vuln({"id": c}):
             return True
     return False
 

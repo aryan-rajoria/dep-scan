@@ -40,6 +40,34 @@ def _make_vdr(
     }
 
 
+def test_is_malware_vuln_uses_native_field_when_present():
+    """When the vdb is_malware field is carried on the result, it is authoritative."""
+    assert utils.is_malware_vuln({"cve_id": "CVE-2024-1", "is_malware": True}) is True
+    assert utils.is_malware_vuln({"cve_id": "MAL-1234", "is_malware": False}) is False
+    # is_malware=False wins even though the cve_id has the MAL- prefix
+    assert utils.is_malware_vuln({"id": "MAL-9999", "is_malware": False}) is False
+
+
+def test_is_malware_vuln_falls_back_to_mal_prefix_on_default_db():
+    """On the default DB the is_malware key is absent, so the helper falls back
+    to the MAL- prefix on whichever id field is present (cve_id or id)."""
+    assert utils.is_malware_vuln({"cve_id": "MAL-2024-1"}) is True
+    assert utils.is_malware_vuln({"id": "MAL-2024-1"}) is True
+    assert utils.is_malware_vuln({"cve_id": "CVE-2024-1"}) is False
+    assert utils.is_malware_vuln({"id": "CVE-2024-1"}) is False
+    assert utils.is_malware_vuln({}) is False
+
+
+def test_check_malware_cve_delegates_to_helper():
+    """check_malware_cve must detect MAL- ids via the is_malware_vuln helper."""
+    from analysis_lib.output import check_malware_cve
+
+    assert check_malware_cve(["CVE-2024-1", "MAL-2024-1"]) is True
+    assert check_malware_cve(["CVE-2024-1", "GHSA-aaaa"]) is False
+    assert check_malware_cve([]) is False
+    assert check_malware_cve(None) is False
+
+
 def test_max_version():
     ret = utils.max_version("1.0.0")
     assert ret == "1.0.0"
