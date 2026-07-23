@@ -414,8 +414,9 @@ def test_reachability_drops_unknown_purl():
 
 
 def _multi_lang_purl_map():
-    """Product tree with Rust (cargo) and Go (golang) components, mirroring the
-    versioned purls the rusi/golem converters reconcile against the BOM."""
+    """Product tree with Rust (cargo), Go (golang) and .NET (nuget) components,
+    mirroring the versioned purls the rusi/golem/dosai converters reconcile
+    against the BOM."""
     bom = {
         "components": [
             {"name": "sqlx", "version": "0.6.2", "purl": "pkg:cargo/sqlx@0.6.2"},
@@ -429,6 +430,16 @@ def _multi_lang_purl_map():
                 "name": "yaml.v2",
                 "version": "2.4.0",
                 "purl": "pkg:golang/gopkg.in/yaml.v2@v2.4.0",
+            },
+            {
+                "name": "Newtonsoft.Json",
+                "version": "13.0.3",
+                "purl": "pkg:nuget/Newtonsoft.Json@13.0.3",
+            },
+            {
+                "name": "AWSSDK.Core",
+                "version": "3.7.0",
+                "purl": "pkg:nuget/AWSSDK.Core@3.7.0",
             },
         ]
     }
@@ -480,6 +491,29 @@ def test_reachability_go_unreachable_gets_not_in_path_flag():
     assert len(flags) == 1
     assert flags[0]["label"] == "vulnerable_code_not_in_execute_path"
     assert flags[0]["product_ids"] == ["pkg:golang/gopkg.in/yaml.v2@v2.4.0"]
+
+
+def test_reachability_dotnet_reachable_is_known_affected():
+    """A NuGet package whose reconciled purl carries a reachable flow (dosai)
+    must map to known_affected -- CSAF VEX is purl-keyed and language-agnostic."""
+    pmap = _multi_lang_purl_map()
+    vuln = {"affects": [{"ref": "pkg:nuget/Newtonsoft.Json@13.0.3"}]}
+    status, flags, scores = classify(vuln, pmap, {"pkg:nuget/Newtonsoft.Json@13.0.3": 2})
+    assert status == {KNOWN_AFFECTED: ["pkg:nuget/Newtonsoft.Json@13.0.3"]}
+    assert flags == []
+    assert scores == ["pkg:nuget/Newtonsoft.Json@13.0.3"]
+
+
+def test_reachability_dotnet_unreachable_gets_not_in_path_flag():
+    """A NuGet package present but unreached (dosai marks only referenced, not
+    called) must map to known_not_affected with the not-in-execute-path flag."""
+    pmap = _multi_lang_purl_map()
+    vuln = {"affects": [{"ref": "pkg:nuget/AWSSDK.Core@3.7.0"}]}
+    status, flags, scores = classify(vuln, pmap, {"pkg:nuget/Newtonsoft.Json@13.0.3": 2})
+    assert status == {KNOWN_NOT_AFFECTED: ["pkg:nuget/AWSSDK.Core@3.7.0"]}
+    assert len(flags) == 1
+    assert flags[0]["label"] == "vulnerable_code_not_in_execute_path"
+    assert flags[0]["product_ids"] == ["pkg:nuget/AWSSDK.Core@3.7.0"]
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,428 @@
+{
+  "Metadata": {
+    "SchemaVersion": "3.3.0",
+    "AnalyzerVersion": "3.0.5.0",
+    "GeneratedAt": "2026-06-28T12:28:44.734309+00:00",
+    "InputPath": "./Dosai",
+    "Tool": "Dosai"
+  },
+  "Nodes": [
+    {
+      "Id": "dfn61",
+      "Kind": "Source",
+      "Name": "input",
+      "Symbol": "TextReader? input",
+      "Type": "TextReader?",
+      "Code": "input",
+      "Path": "McpServer.cs",
+      "FileName": "McpServer.cs",
+      "Namespace": "Depscan",
+      "ClassName": "McpServer",
+      "MethodName": "Run",
+      "LineNumber": 16,
+      "ColumnNumber": 5,
+      "IsSource": true,
+      "IsSink": false,
+      "MatchedPatterns": [
+        "input"
+      ],
+      "Category": "input",
+      "MethodIdentity": {
+        "Id": "Run",
+        "SourceSignature": "Run",
+        "Symbol": "Run",
+        "AssemblyName": "Dosai.DataFlow.CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
+        "ModuleName": "Dosai.DataFlow.CSharp.dll",
+        "Namespace": "Depscan",
+        "ClassName": "McpServer",
+        "MethodName": "Run",
+        "MetadataToken": 0,
+        "Evidence": [
+          "SourceRoslynDirect"
+        ]
+      },
+      "Evidence": [
+        {
+          "Kind": "SourceRoslynDirect",
+          "Source": "roslyn-source",
+          "Description": "Data-flow node discovered from Roslyn operation analysis.",
+          "Confidence": "Medium",
+          "FileName": "McpServer.cs",
+          "LineNumber": 16,
+          "ColumnNumber": 5
+        }
+      ],
+      "Properties": {
+        "method": "Run"
+      }
+    },
+    {
+      "Id": "dfn62",
+      "Kind": "Assignment",
+      "Name": "line",
+      "Symbol": "line",
+      "Type": "string",
+      "Code": "line = input.ReadLine()",
+      "Path": "McpServer.cs",
+      "FileName": "McpServer.cs",
+      "Namespace": "Depscan",
+      "ClassName": "McpServer",
+      "MethodName": "Run",
+      "LineNumber": 20,
+      "ColumnNumber": 17,
+      "IsSource": false,
+      "IsSink": false,
+      "MatchedPatterns": [],
+      "MethodIdentity": {
+        "Id": "Run",
+        "SourceSignature": "Run",
+        "Symbol": "Run",
+        "AssemblyName": "Dosai.DataFlow.CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
+        "ModuleName": "Dosai.DataFlow.CSharp.dll",
+        "Namespace": "Depscan",
+        "ClassName": "McpServer",
+        "MethodName": "Run",
+        "MetadataToken": 0,
+        "Evidence": [
+          "SourceRoslynDirect"
+        ]
+      },
+      "Evidence": [
+        {
+          "Kind": "SourceRoslynDirect",
+          "Source": "roslyn-source",
+          "Description": "Data-flow node discovered from Roslyn operation analysis.",
+          "Confidence": "Medium",
+          "FileName": "McpServer.cs",
+          "LineNumber": 20,
+          "ColumnNumber": 17
+        }
+      ],
+      "Properties": {
+        "method": "Run",
+        "taintKinds": "input"
+      }
+    },
+    {
+      "Id": "dfn65",
+      "Kind": "Sink",
+      "Name": "Deserialize",
+      "Symbol": "System.Text.Json.JsonSerializer.Deserialize(string,System.Text.Json.JsonSerializerOptions)",
+      "Type": "Depscan.McpServer.JsonRpcRequest",
+      "Purl": "pkg:nuget/System.Text.Json",
+      "Code": "JsonSerializer.Deserialize<JsonRpcRequest>(line, JsonOptions)",
+      "Path": "McpServer.cs",
+      "FileName": "McpServer.cs",
+      "Namespace": "Depscan",
+      "ClassName": "McpServer",
+      "MethodName": "Run",
+      "LineNumber": 30,
+      "ColumnNumber": 27,
+      "IsSource": false,
+      "IsSink": true,
+      "MatchedPatterns": [
+        "Deserialize",
+        "System.Text.Json.JsonSerializer.Deserialize"
+      ],
+      "Category": "deserialization",
+      "MethodIdentity": {
+        "Id": "Run",
+        "SourceSignature": "Run",
+        "Symbol": "Run",
+        "AssemblyName": "Dosai.DataFlow.CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
+        "ModuleName": "Dosai.DataFlow.CSharp.dll",
+        "Namespace": "Depscan",
+        "ClassName": "McpServer",
+        "MethodName": "Run",
+        "MetadataToken": 0,
+        "Evidence": [
+          "SourceRoslynDirect"
+        ]
+      },
+      "Evidence": [
+        {
+          "Kind": "SourceRoslynDirect",
+          "Source": "roslyn-source",
+          "Description": "Data-flow node discovered from Roslyn operation analysis.",
+          "Confidence": "Medium",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 27
+        }
+      ],
+      "Properties": {
+        "method": "Run"
+      }
+    }
+  ],
+  "Edges": [
+    {
+      "Id": "dfe104",
+      "SourceId": "dfn61",
+      "TargetId": "dfn62",
+      "Kind": "Assignment",
+      "Label": "line",
+      "Path": "McpServer.cs",
+      "FileName": "McpServer.cs",
+      "LineNumber": 20,
+      "ColumnNumber": 17
+    },
+    {
+      "Id": "dfe110",
+      "SourceId": "dfn61",
+      "TargetId": "dfn65",
+      "Kind": "SinkArgument",
+      "Label": "json",
+      "TargetPurl": "pkg:nuget/System.Text.Json",
+      "Path": "McpServer.cs",
+      "FileName": "McpServer.cs",
+      "LineNumber": 30,
+      "ColumnNumber": 70
+    },
+    {
+      "Id": "dfe111",
+      "SourceId": "dfn62",
+      "TargetId": "dfn65",
+      "Kind": "SinkArgument",
+      "Label": "json",
+      "TargetPurl": "pkg:nuget/System.Text.Json",
+      "Path": "McpServer.cs",
+      "FileName": "McpServer.cs",
+      "LineNumber": 30,
+      "ColumnNumber": 70
+    }
+  ],
+  "Slices": [
+    {
+      "Id": "dfs1",
+      "SourceId": "dfn61",
+      "SinkId": "dfn65",
+      "NodeIds": [
+        "dfn61",
+        "dfn62",
+        "dfn65"
+      ],
+      "EdgeIds": [
+        "dfe104",
+        "dfe110",
+        "dfe111"
+      ],
+      "SourceCategory": "input",
+      "SinkCategory": "deserialization",
+      "SinkPurl": "pkg:nuget/System.Text.Json",
+      "Purls": [
+        "pkg:nuget/System.Text.Json"
+      ],
+      "SinkArgument": "line",
+      "SinkArgumentIndex": 0,
+      "Summary": "Data flows from dfn61 to Deserialize argument 0.",
+      "TaintKinds": [
+        "input"
+      ],
+      "FieldPaths": [
+        "line"
+      ],
+      "Confidence": "Medium"
+    }
+  ],
+  "PackageReachability": [
+    {
+      "Purl": "pkg:nuget/System.Text.Json",
+      "Reachable": true,
+      "ReachabilityKind": "DataFlowNode",
+      "Confidence": "High",
+      "ConfidenceReasons": [
+        "Data-flow slice confidence is Medium.",
+        "Reachability is supported by direct source or IL call evidence."
+      ],
+      "EvidenceKinds": [
+        "AssemblyIlDirect",
+        "SourceRoslynDirect"
+      ],
+      "NodeIds": [
+        "dfn418",
+        "dfn561",
+        "dfn449",
+        "dfn450",
+        "dfn592",
+        "dfn593",
+        "dfn63",
+        "dfn65"
+      ],
+      "EdgeIds": [
+        "dfe419",
+        "dfe420",
+        "dfe421",
+        "dfe425",
+        "dfe861",
+        "dfe862",
+        "dfe863",
+        "dfe867",
+        "dfe429",
+        "dfe871",
+        "dfe1006",
+        "dfe1007",
+        "dfe1008",
+        "dfe1009",
+        "dfe1010",
+        "dfe1011",
+        "dfe1015",
+        "dfe109",
+        "dfe564",
+        "dfe565",
+        "dfe566",
+        "dfe567",
+        "dfe568",
+        "dfe569",
+        "dfe573",
+        "dfe105",
+        "dfe106",
+        "dfe110",
+        "dfe111",
+        "dfe1019",
+        "dfe577",
+        "dfe118",
+        "dfe114"
+      ],
+      "SliceIds": [
+        "dfs1",
+        "dfs5",
+        "dfs7"
+      ],
+      "EntryPointIds": [],
+      "Categories": [
+        "deserialization"
+      ],
+      "SourceLocations": [
+        {
+          "Path": "DosaiQueryEngine.cs",
+          "FileName": "DosaiQueryEngine.cs",
+          "LineNumber": 11,
+          "ColumnNumber": 9,
+          "Kind": "DataFlowEdge"
+        },
+        {
+          "Path": "DosaiQueryEngine.cs",
+          "FileName": "DosaiQueryEngine.cs",
+          "LineNumber": 11,
+          "ColumnNumber": 9,
+          "Kind": "DataFlowNode"
+        },
+        {
+          "Path": "DosaiQueryEngine.cs",
+          "FileName": "DosaiQueryEngine.cs",
+          "LineNumber": 12,
+          "ColumnNumber": 5,
+          "Kind": "DataFlowEdge"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 17,
+          "Kind": "DataFlowEdge"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 17,
+          "Kind": "DataFlowNode"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 17,
+          "Kind": "DataFlowSlice"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 27,
+          "Kind": "DataFlowEdge"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 27,
+          "Kind": "DataFlowNode"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 27,
+          "Kind": "DataFlowSlice"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 70,
+          "Kind": "DataFlowEdge"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 30,
+          "ColumnNumber": 70,
+          "Kind": "DataFlowSlice"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 37,
+          "ColumnNumber": 17,
+          "Kind": "DataFlowEdge"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 37,
+          "ColumnNumber": 21,
+          "Kind": "DataFlowEdge"
+        },
+        {
+          "Path": "McpServer.cs",
+          "FileName": "McpServer.cs",
+          "LineNumber": 37,
+          "ColumnNumber": 30,
+          "Kind": "DataFlowEdge"
+        }
+      ]
+    }
+  ],
+  "WeaknessCandidates": [
+    {
+      "Id": "wc1",
+      "Kind": "UnsafeDeserializationCandidate",
+      "Cwe": "CWE-502",
+      "Confidence": "Medium",
+      "ConfidenceReasons": [
+        "Source matched category 'input'.",
+        "Sink matched category 'deserialization'.",
+        "Slice contains package URL metadata."
+      ],
+      "SliceId": "dfs1",
+      "SourceId": "dfn61",
+      "SinkId": "dfn65",
+      "SourceCategory": "input",
+      "SinkCategory": "deserialization",
+      "SourceLocation": "McpServer.cs:16:5",
+      "SinkLocation": "McpServer.cs:30:27",
+      "Purls": [
+        "pkg:nuget/System.Text.Json"
+      ],
+      "Evidence": [
+        "Source input at McpServer.cs:16:5: input",
+        "Sink Deserialize at McpServer.cs:30:27: JsonSerializer.Deserialize<JsonRpcRequest>(line, JsonOptions)",
+        "Slice path has 3 nodes and 3 edges."
+      ],
+      "Summary": "input data reaches deserialization sink Deserialize."
+    }
+  ],
+  "DangerousApiReachability": []
+}

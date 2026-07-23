@@ -11,6 +11,7 @@ OWASP dep-scan is a next-generation security and risk audit tool based on known 
 - [Features](#features)
     - [Rust reachability (via rusi)](#rust-reachability-via-rusi)
     - [Go reachability (via golem)](#go-reachability-via-golem)
+    - [.NET reachability (via dosai)](#net-reachability-via-dosai)
     - [Vulnerability Data sources](#vulnerability-data-sources)
     - [Linux distros](#linux-distros)
 - [Quick Start](#quick-start)
@@ -94,6 +95,29 @@ depscan -i ./my-go-app -o ./reports -t go --go-analyzer-network offline
 **Locating the golem binary.** dep-scan resolves golem the same way cdxgen does: the `GOLEM_CMD` env var, then `DEPSCAN_GOLEM_BINARY`, then `golem` on `PATH`, then the bundled `cdxgen-plugins-bin` layout (`<pluginsDir>/golem/golem-<platform>-<arch>`). When cdxgen spawns, dep-scan propagates `GOLEM_CMD` and `CDXGEN_PLUGINS_DIR` to the subprocess so both sides use the same binary. If golem or the Go toolchain cannot be found, Go reachability is skipped with a warning (never a crash); other languages are unaffected.
 
 **Safety.** golem loads packages via `golang.org/x/tools/go/packages` with full type/SSA info but does **not** run the program and does **not** run `go:generate`. Package loading uses the local Go toolchain, so module downloads can occur depending on the Go env. dep-scan defaults to `GOFLAGS=-mod=readonly` to prevent `go.mod` rewrites on untrusted repos. Use `--go-analyzer-network offline` (sets `GOPROXY=off`) to forbid all downloads; this requires a warm module cache (`GOMODCACHE`).
+
+### .NET reachability (via dosai)
+
+.NET reachability (C#/VB/F#/R) is powered by [dosai (Dotnet Source and Assembly Inspector)](https://github.com/owasp-dep-scan/dosai) — a .NET analysis engine shipped prebuilt via cdxgen-plugins-bin. dosai inspects source (Roslyn) and assemblies (Reflection + IL) and emits a call graph, interprocedural source→sink data-flow slices, explicit per-package reachability (`PackageReachability` with `ReachabilityKind` + `Confidence`), weakness candidates (CWE-tagged), and dangerous-API reachability. dep-scan consumes dosai's **native** facts directly for the reachability verdict and emits an atom-shaped projection so a vulnerable NuGet package that is actually **called** (e.g. `Newtonsoft.Json.JsonConvert.DeserializeObject` on a controlled input) is marked **Reachable** while a package that is merely referenced but never called is not.
+
+**How it runs.** Under `--profile research` (forced when reachability is on), `cdxgen` runs dosai and persists the combined native report `{Metadata, methods, dataflows}` to the `*-semantics.slices.json` path. dep-scan consumes that persisted report (the PRIMARY path) and does **not** spawn dosai itself when cdxgen + plugins are available. dosai is invoked directly only as a fallback (`dataflows` + `methods` with `--pattern-packs all`).
+
+**Enabling it.** Reachability is on by default for .NET projects (`-t dotnet`, `--reachability-analyzer FrameworkReachability`); `SemanticReachability` additionally attributes reached services and endpoints.
+
+```bash
+# .NET reachability is automatic; just scan the project
+depscan -i ./my-dotnet-app -o ./reports -t dotnet
+
+# point dep-scan at a specific dosai binary
+DEPSCAN_DOSAI_BINARY=/path/to/dosai depscan -i ./my-dotnet-app -o ./reports -t dotnet
+
+# prefer source vs assembly inspection explicitly
+depscan -i ./my-dotnet-app -o ./reports -t dotnet --dotnet-analyzer-mode source
+```
+
+**Locating the dosai binary.** dep-scan resolves dosai the same way cdxgen does: the `DOSAI_CMD` env var, then `DEPSCAN_DOSAI_BINARY`, then `dosai`/`Dosai` on `PATH`, then the bundled `cdxgen-plugins-bin` layout (`<pluginsDir>/dosai/dosai-<platform>-<arch>`). When cdxgen spawns, dep-scan propagates `DOSAI_CMD` and `CDXGEN_PLUGINS_DIR` to the subprocess so both sides use the same binary. If dosai cannot be found, .NET reachability is skipped with a warning (never a crash); other languages are unaffected.
+
+**Runtime requirement.** dosai needs a .NET runtime to load; dep-scan probes `dotnet --version` and skips gracefully with a diagnostic when absent. A self-contained `-full` dosai binary (from the [dosai releases](https://github.com/owasp-dep-scan/dosai/releases)) bundles the runtime and needs no SDK. For best versioned NuGet purls, scan a **restored** tree (`project.assets.json` / `*.deps.json` present) — dosai falls back to versionless `System.*` framework purls otherwise. dep-scan does **not** run `dotnet restore` itself (untrusted-repo/network risk).
 
 ### Clear insights about CVEs
 

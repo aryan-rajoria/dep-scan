@@ -1,0 +1,16 @@
+{
+  "components": [
+    {
+      "type": "library",
+      "name": "System.Text.Json",
+      "purl": "pkg:nuget/System.Text.Json@10.0.0"
+    }
+  ],
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "app",
+      "purl": "pkg:nuget/Depscan@1.0.0"
+    }
+  }
+}

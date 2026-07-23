@@ -17,6 +17,8 @@ from xbom_lib.cdxgen import (
 )
 from depscan.cli_options import DEFAULT_SPEC_VERSION
 from depscan.lib.config import (
+    DOSAI_PATTERN_PACKS_DEFAULT,
+    DOSAI_REACHABLES_SLICE_FILE,
     GOLEM_DEFAULT_CALLGRAPH_MODE,
     GOLEM_DEFAULT_DATAFLOW_MODE,
     GOLEM_REACHABLES_SLICE_FILE,
@@ -333,6 +335,11 @@ def create_bom(bom_file, src_dir=".", options=None):
         # the BOM. No-op for non-go projects or when reachability is off /
         # golem is absent.
         run_golem_reachability(bom_file, src_dir, options=options)
+        # .NET reachability via dosai: emits dotnet-reachables.slices.json next
+        # to the BOM. No-op for non-dotnet projects or when reachability is off
+        # / dosai is absent. PRIMARY path consumes the cdxgen-persisted
+        # combined native report; direct-spawn is only a fallback.
+        run_dosai_reachability(bom_file, src_dir, options=options)
         return True
 
 
@@ -609,6 +616,185 @@ def run_golem_reachability(
     return True
 
 
+def _load_dosai_report(path, is_report_ok, json_load, require_report=False):
+    """Load a dosai report JSON, or return None.
+
+    When ``require_report`` is set, a file that is not a dosai report (e.g. an
+    atom-produced semantics slice that happens to share the path) is rejected
+    by validating its structural SHAPE (``Metadata.Tool == "Dosai"`` plus a
+    ``methods``/``dataflows`` OR ``Slices``/``PackageReachability`` key) -- this
+    is how we tell cdxgen's persisted combined dosai report apart from any other
+    ``*-semantics.slices.json``. When not required (direct-dosai fallback), a
+    shape mismatch only warns.
+    """
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        data = json_load(path, log=LOG)
+    except Exception as e:
+        LOG.debug("Could not read dosai report %s: %s", path, e)
+        return None
+    if not isinstance(data, dict):
+        return None
+    if not is_report_ok(data):
+        if require_report:
+            return None
+        LOG.warning("dosai report shape was not recognized; conversion may be incomplete.")
+    return data
+
+
+def _run_dosai_fallback(src_dir, bom_dir, options, is_report_ok, json_load):
+    """Invoke dosai directly when cdxgen did not produce a report. Returns the
+    parsed combined report ``{Metadata, methods, dataflows}`` or None. Kept as a
+    fallback so reachability still works when cdxgen/plugins are unavailable."""
+    try:
+        from xbom_lib.dosai import run_dosai
+    except ImportError as e:
+        LOG.debug("dosai runner unavailable: %s", e)
+        return None
+    pattern_packs = options.get("dotnet_pattern_packs") or DOSAI_PATTERN_PACKS_DEFAULT
+    with console.status(f"Running dosai .NET reachability on '{src_dir}'.", spinner=SPINNER):
+        res = run_dosai(
+            src_dir,
+            bom_dir,
+            pattern_packs=pattern_packs,
+            logger=LOG,
+        )
+    if res.skipped or not res.success:
+        return None
+    # Assemble a combined report from the two persisted raw artifacts (source
+    # of truth). Each may be missing if dosai produced only one.
+    methods = None
+    dataflows = None
+    if res.methods_path and os.path.exists(res.methods_path):
+        try:
+            methods = json_load(res.methods_path, log=LOG)
+        except Exception as e:
+            LOG.debug("Could not read dosai methods report %s: %s", res.methods_path, e)
+    if res.dataflows_path and os.path.exists(res.dataflows_path):
+        try:
+            dataflows = json_load(res.dataflows_path, log=LOG)
+        except Exception as e:
+            LOG.debug("Could not read dosai dataflows report %s: %s", res.dataflows_path, e)
+    if not methods and not dataflows:
+        return None
+    # prefer the dataflows Metadata (richest), else methods
+    meta = (
+        (dataflows or {}).get("Metadata") or (methods or {}).get("Metadata") or {"Tool": "Dosai"}
+    )
+    combined = {"Metadata": meta, "methods": methods or {}, "dataflows": dataflows or {}}
+    return _load_dosai_report_value(combined, is_report_ok)
+
+
+def _load_dosai_report_value(data, is_report_ok):
+    """Validate an already-parsed combined dosai report dict (no file read)."""
+    if not isinstance(data, dict):
+        return None
+    if not is_report_ok(data):
+        LOG.warning("dosai report shape was not recognized; conversion may be incomplete.")
+    return data
+
+
+def run_dosai_reachability(
+    bom_file: str,
+    src_dir: str,
+    options: Optional[Dict] = None,
+) -> bool:
+    """Run dosai + the slice converter for a .NET project and drop the
+    atom-shaped reachables slice next to the BOM.
+
+    No-op (returns False) unless the project is .NET AND reachability is on.
+    Gracefully degrades when the dosai binary or .NET runtime is missing (warns,
+    returns False, never raises) so non-.NET and binary-less environments are
+    unaffected.
+
+    PRIMARY path: consume the combined native dosai report cdxgen already
+    persisted at ``<bomdir>/<prefix>-semantics.slices.json`` (validated by
+    ``is_dosai_report``). Under ``--profile research`` cdxgen runs dosai and
+    persists ``{Metadata, methods, dataflows}`` there, so depscan need NOT
+    re-spawn dosai when cdxgen + plugins are available, and reads the FULL
+    native report, not the projected subset cdxgen embeds in the SBOM.
+
+    FALLBACK path: if the persisted report is absent/invalid, spawn dosai
+    directly via :func:`xbom_lib.dosai.run_dosai` (dataflows + methods) and
+    persist the raw artifacts.
+
+    Reachability verdict: the atom projection (:func:`convert_dosai_report`)
+    faithfully carries every native-reachable purl in its flows' ``purls``, so
+    the existing purl-keyed engine picks them up unchanged. The native facts
+    (:func:`extract_native_reachability`) are also stashed for VEX/advanced
+    analysis. This is the ONLY wiring point for dosai reachability.
+    """
+    if not options:
+        return False
+    project_type_list: List[str] = options.get("project_type") or []
+    # cdxgen labels .csproj projects "dotnet"; accept csharp/nuget aliases too
+    # so an alternate project-type token never silently skips reachability.
+    if not any(pt in ("dotnet", "csharp", "nuget") for pt in project_type_list):
+        return False
+    if options.get("reachability_analyzer") == "off":
+        return False
+    if not bom_file or not os.path.exists(bom_file):
+        return False
+    try:
+        from analysis_lib.dosai_slices import (
+            build_bom_purl_index,
+            convert_dosai_report,
+            extract_native_reachability,
+            is_dosai_report,
+            write_slices_file,
+        )
+        from custom_json_diff.lib.utils import json_load as _json_load
+    except ImportError as e:
+        LOG.debug("dosai reachability dependencies unavailable: %s", e)
+        return False
+
+    bom_dir = os.path.dirname(os.path.abspath(bom_file))
+    slice_path = os.path.join(bom_dir, DOSAI_REACHABLES_SLICE_FILE)
+    prefix = project_type_list[0] if project_type_list else "dotnet"
+
+    # PRIMARY: prefer the combined dosai report cdxgen already produced.
+    cdxgen_report_path = os.path.join(bom_dir, f"{prefix}-semantics.slices.json")
+    report = _load_dosai_report(
+        cdxgen_report_path, is_dosai_report, _json_load, require_report=True
+    )
+    if report is not None:
+        LOG.debug(
+            "dosai reachability: using cdxgen-produced report at %s",
+            cdxgen_report_path,
+        )
+    else:
+        # FALLBACK: cdxgen did not produce a dosai report (plugins unavailable,
+        # or reachability invoked without cdxgen). Invoke dosai directly.
+        report = _run_dosai_fallback(src_dir, bom_dir, options, is_dosai_report, _json_load)
+    if report is None:
+        LOG.debug("No dosai report available; reachability via dosai skipped.")
+        return False
+
+    bom_data = _json_load(bom_file, log=LOG) or {}
+    components = bom_data.get("components", []) or []
+    extra = []
+    meta_comp = (bom_data.get("metadata") or {}).get("component")
+    if isinstance(meta_comp, dict):
+        extra.append(meta_comp)
+    bom_index = build_bom_purl_index(components, extra_components=extra)
+
+    # Stash the native reachability facts (the truth) as a sidecar for
+    # VEX/advanced analysis. The verdict itself flows through the atom
+    # projection below via the existing purl-keyed engine loop.
+    facts_path = os.path.join(bom_dir, "dotnet-reachability.facts.json")
+    try:
+        facts = extract_native_reachability(report, bom_index)
+        json_dump(facts_path, facts, compact=True)
+    except Exception as e:
+        LOG.debug("Could not persist dosai native reachability facts: %s", e)
+
+    flows = convert_dosai_report(report, bom_index)
+    write_slices_file(slice_path, flows)
+    LOG.debug("dosai reachability: wrote %d flows to %s", len(flows), slice_path)
+    return True
+
+
 def create_blint_bom(bom_file: str, src_dir: str = ".", options: Optional[Dict] = None) -> bool:
     """
     Method to create BOM file by using blint
@@ -732,6 +918,14 @@ def create_lifecycle_boms(cdxgen_lib, src_dir, options):
     # absent.
     if any_success and any(pt in ("go", "golang") for pt in (options.get("project_type") or [])):
         run_golem_reachability(build_bom_file, src_dir, options=options)
+    # .NET reachability via dosai: run once against the source and drop the
+    # slice next to the build BOM (the bom_dir the reachability engine scans).
+    # No-op for non-dotnet projects, when reachability is off, or when dosai is
+    # absent.
+    if any_success and any(
+        pt in ("dotnet", "csharp", "nuget") for pt in (options.get("project_type") or [])
+    ):
+        run_dosai_reachability(build_bom_file, src_dir, options=options)
     return any_success
 
 

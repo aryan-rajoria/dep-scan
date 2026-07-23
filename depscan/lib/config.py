@@ -351,3 +351,31 @@ GOLEM_DEFAULT_DATAFLOW_MODE = "all"
 # for atom reachables slices (set_slices_args in xbom_lib/cdxgen.py) so the
 # glob-based discovery in ReachabilityAnalysisKV picks it up unchanged.
 GOLEM_REACHABLES_SLICE_FILE = "go-reachables.slices.json"
+
+# --- dosai (Dotnet Source and Assembly Inspector) reachability -----------
+# env override for the dosai binary path. Mirrors DOSAI_BINARY_ENV in
+# xbom_lib/dosai.py; duplicated here so the CLI/config layer is standalone.
+DOSAI_BINARY_ENV = "DEPSCAN_DOSAI_BINARY"
+# cdxgen's plugin override env for dosai. Honored FIRST so depscan's fallback
+# resolves the same binary cdxgen uses (and which produced the persisted
+# report).
+DOSAI_CMD_ENV = "DOSAI_CMD"
+# Pattern packs select the source/sink categories dosai looks for. ``all``
+# maximizes the reachability signal (only the dataflows command accepts it).
+DOSAI_PATTERN_PACKS_DEFAULT = "all"
+# Raw native artifacts persisted in the bom dir on the direct-spawn fallback
+# path (source of truth -- never deleted).
+DOSAI_DATAFLOWS_FILE = "dotnet-dataflows.json"
+DOSAI_METHODS_FILE = "dotnet-methods.json"
+# dosai reports are detected by structural SHAPE (Metadata.Tool == "Dosai" +
+# methods/dataflows OR Slices/PackageReachability/CallGraph), not a schema
+# prefix -- see analysis_lib.dosai_slices.
+# Atom projection dep-scan writes for dotnet projects. Matches the name cdxgen
+# uses for atom reachables slices (set_slices_args in xbom_lib/cdxgen.py) so the
+# glob-based discovery in ReachabilityAnalysisKV picks it up unchanged.
+DOSAI_REACHABLES_SLICE_FILE = "dotnet-reachables.slices.json"
+# Default analyzer mode. ``auto`` selects source when a source tree is present
+# and assembly for bin/.nupkg-only inputs.
+DOSAI_DEFAULT_ANALYZER_MODE = "auto"
+# How many reachable explanations to render for dotnet (parallel to rust/go).
+max_dotnet_reachable_explanations = get_int_from_env("max_dotnet_reachable_explanations", 20)
