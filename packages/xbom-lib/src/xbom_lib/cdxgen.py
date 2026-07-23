@@ -304,12 +304,13 @@ class CdxgenGenerator(XBOMGenerator):
             env["CDXGEN_TEMP_DIR"] = cdxgen_temp_dir
         env["CDXGEN_TIMEOUT_MS"] = CDXGEN_TIMEOUT_MS
         # Propagate plugin-discovery env to the cdxgen subprocess so cdxgen can
-        # locate the SAME rusi binary depscan resolved (RUSI_CMD) and the
-        # plugins dir find_cdxgen_cmd just detected (CDXGEN_PLUGINS_DIR). ``env``
-        # was copied before find_cdxgen_cmd ran, so re-sync these explicitly
-        # rather than relying on copy order; this keeps cdxgen's rusi resolution
-        # consistent with depscan's fallback in xbom_lib/rusi.py.
-        for _plug_env in ("RUSI_CMD", "GOLEM_CMD", "CDXGEN_PLUGINS_DIR"):
+        # locate the SAME rusi/golem/dosai binary depscan resolved (RUSI_CMD /
+        # GOLEM_CMD / DOSAI_CMD) and the plugins dir find_cdxgen_cmd just
+        # detected (CDXGEN_PLUGINS_DIR). ``env`` was copied before
+        # find_cdxgen_cmd ran, so re-sync these explicitly rather than relying
+        # on copy order; this keeps cdxgen's plugin resolution consistent with
+        # depscan's fallback in xbom_lib/rusi.py / golem.py / dosai.py.
+        for _plug_env in ("RUSI_CMD", "GOLEM_CMD", "DOSAI_CMD", "CDXGEN_PLUGINS_DIR"):
             _plug_val = os.environ.get(_plug_env)
             if _plug_val:
                 env[_plug_env] = _plug_val

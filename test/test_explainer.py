@@ -52,6 +52,20 @@ def go_slices():
         return json.load(fp)
 
 
+@pytest.fixture
+def dotnet_slices():
+    with open(
+        os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "data",
+            "dotnet-reachables.slices.json",
+        ),
+        mode="r",
+        encoding="utf-8",
+    ) as fp:
+        return json.load(fp)
+
+
 def test_explain_reachables(test_data, capsys):
     explainer.explain_reachables("auto", test_data, "java", {}, None)
     captured = capsys.readouterr()
@@ -135,6 +149,10 @@ def test_is_analyzer_slice_detects_go(go_slices):
     assert explainer.is_analyzer_slice(go_slices[0].get("flows")) is True
 
 
+def test_is_analyzer_slice_detects_dotnet(dotnet_slices):
+    assert explainer.is_analyzer_slice(dotnet_slices[0].get("flows")) is True
+
+
 def test_is_analyzer_slice_rejects_atom_slices(test_data):
     """Java/JS atom slices must NOT be detected as analyzer slices."""
     for areach in test_data:
@@ -196,6 +214,32 @@ def test_explain_reachables_go_renders_flows(monkeypatch, go_slices):
     assert "pkg:golang/github.com/jackc/pgx/v4@v4.18.1" in text
     # The vulnerability id must appear
     assert "CVE-2024-PGX" in text
+
+
+def test_explain_reachables_dotnet_renders_flows(monkeypatch, dotnet_slices):
+    """dotnet (dosai) slices must render a readable source -> sink data-flow
+    with file:line, tags, and the vulnerable NuGet purl in the console output."""
+    rec_console = Console(record=True, color_system=None, width=140)
+    monkeypatch.setattr(explainer, "console", rec_console)
+
+    purl_vuln_map = defaultdict(list)
+    purl_vuln_map["pkg:nuget/System.Text.Json@10.0.0"].append(
+        {"id": "GHSA-STJ-DOSAI", "severity": "HIGH"}
+    )
+
+    header = Markdown("## Reachable Flows\n\nTest .NET flows.")
+    has_explanation, _, _ = explainer.explain_reachables(
+        "auto", dotnet_slices, "dotnet", None, purl_vuln_map, None, header
+    )
+
+    assert has_explanation, "at least one dosai flow must be explained"
+    text = rec_console.export_text()
+    # The file:line location (C# source) must appear
+    assert "McpServer.cs" in text
+    # The reconciled dependency purl must appear in the rendered tags/packages
+    assert "pkg:nuget/System.Text.Json@10.0.0" in text
+    # The vulnerability id must appear
+    assert "GHSA-STJ-DOSAI" in text
 
 
 # ---------------------------------------------------------------------------

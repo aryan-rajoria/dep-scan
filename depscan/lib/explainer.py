@@ -219,17 +219,18 @@ def is_cpp_flow(flows):
 
 
 def is_analyzer_slice(flows):
-    """Detect whether a flows list was produced by the rusi/golem converters
-    rather than atom.
+    """Detect whether a flows list was produced by the rusi/golem/dosai
+    converters rather than atom.
 
-    The converters always emit an explicit ``rust`` / ``go`` language token as
-    a standalone comma-separated entry in every node's ``tags`` string (see the
-    ``_build_node_tags`` helpers in ``rusi_slices``/``golem_slices``). We match
-    that token exactly -- a raw substring test would false-positive on atom
-    tags containing purls like ``google``/``mongodb``/``django`` and wrongly
-    relax the gates for real Java/JS projects. When true, the explainer relaxes
-    the minimum rendered-node count so honest 2-node Rust/Go flows render while
-    atom flows keep the stricter bar.
+    The converters always emit an explicit ``rust`` / ``go`` / ``dotnet``
+    language token as a standalone comma-separated entry in every node's
+    ``tags`` string (see the ``_build_node_tags`` helpers in
+    ``rusi_slices``/``golem_slices``/``dosai_slices``). We match that token
+    exactly -- a raw substring test would false-positive on atom tags containing
+    purls like ``google``/``mongodb``/``django`` and wrongly relax the gates for
+    real Java/JS projects. When true, the explainer relaxes the minimum
+    rendered-node count so honest 2-node Rust/Go/.NET flows render while atom
+    flows keep the stricter bar.
     """
     if not flows:
         return False
@@ -240,7 +241,7 @@ def is_analyzer_slice(flows):
         if not isinstance(tags, str):
             continue
         tokens = {t.strip() for t in tags.split(",")}
-        if "rust" in tokens or "go" in tokens:
+        if "rust" in tokens or "go" in tokens or "dotnet" in tokens:
             return True
     return False
 
@@ -509,8 +510,12 @@ def flow_to_source_sink(idx, flow, purls, project_type, vdr_result, purl_vuln_ma
         param_name = ""
     parent_file = flow.get("parentFileName", "")
     parent_method = flow.get("parentMethodName") or ""
-    # Improve the labels based on the language
-    if re.search(".(js|ts|jsx|tsx|py|cs|php|rs|go)$", parent_file):
+    # Improve the labels based on the language. Covers JS/TS, Python, C#,
+    # PHP, Rust, Go, and the .NET sibling languages (VB.NET, F#) plus R source
+    # so dosai-produced flows render with function/argument wording.
+    if re.search(
+        r"\.(js|ts|jsx|tsx|py|cs|vb|vbnet|fs|fsx|php|rs|go|r)$", parent_file, re.IGNORECASE
+    ):
         method_str = "function"
         param_str = "argument"
         if parent_method in ("handleRequest",):
