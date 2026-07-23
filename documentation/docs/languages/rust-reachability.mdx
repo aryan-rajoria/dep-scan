@@ -10,7 +10,7 @@ After this chapter you will be able to run dep-scan reachability on a Rust proje
 
 ## What rusi is and when to use it
 
-[Rusi (Rust Source Inspector)](https://github.com/appthreat/rusi) is the native slicer dep-scan uses for Rust. It emits a call graph and interprocedural source-to-sink data-flow slices with purl attribution, which dep-scan converts into its shared, purl-keyed reachability pipeline. The result is that a vulnerable crate whose functions are actually called (for example `time::now()` in the RUSTSEC-2020-0071 segfault advisory) is marked Reachable, while a crate that is merely listed in the BOM but never called is not. Reachability is on by default for Rust once the slices are present, so for most projects you simply scan with the research profile and read the Reachable insights.
+[Rusi (Rust Source Inspector)](https://github.com/cdxgen/cdxgen-plugins-bin) is the native slicer dep-scan uses for Rust. It emits a call graph and interprocedural source-to-sink data-flow slices with purl attribution, which dep-scan converts into its shared, purl-keyed reachability pipeline. The result is that a vulnerable crate whose functions are actually called (for example `time::now()` in the RUSTSEC-2020-0071 segfault advisory) is marked Reachable, while a crate that is merely listed in the BOM but never called is not. Reachability is on by default for Rust once the slices are present, so for most projects you simply scan with the research profile and read the Reachable insights.
 
 ## Prerequisites
 

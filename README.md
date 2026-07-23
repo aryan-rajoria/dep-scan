@@ -52,99 +52,39 @@ dep-scan computes reachability for seven language ecosystems through four slicer
 | JavaScript / TypeScript            | atom                                                  | `FrameworkReachability` |
 | Python                             | atom                                                  | `FrameworkReachability` |
 | PHP                                | atom                                                  | `FrameworkReachability` |
-| Rust                               | [rusi](https://github.com/appthreat/rusi)             | `FrameworkReachability` |
+| Rust                               | [rusi](https://github.com/cdxgen/cdxgen-plugins-bin)  | `FrameworkReachability` |
 | Go                                 | [golem](https://github.com/cdxgen/cdxgen-plugins-bin) | `FrameworkReachability` |
 | .NET (C#, VB, F#, R)               | [dosai](https://github.com/owasp-dep-scan/dosai)      | `FrameworkReachability` |
 
 For the concepts behind reachability and prioritization, read the [reachability model](https://depscan.readthedocs.io/concepts/reachability-model) and [prioritization](https://depscan.readthedocs.io/concepts/prioritization) chapters. For per-language worked examples, see the [Language Guides](https://depscan.readthedocs.io/languages/rust-reachability). For the compliance story (VDR and CSAF VEX), see the [VDR guide](https://depscan.readthedocs.io/output/vdr-guide) and the [CSAF VEX guide](https://depscan.readthedocs.io/output/vex-csaf-guide).
 
-### Rust reachability (via rusi)
+Reachability is on by default under `--profile research`, which is what dep-scan uses when reachability is on. The commands below are enough to get started; the per-language guides cover binary resolution, backend and network safety, restore requirements, and worked examples on the in-repo fixtures.
 
-Rust reachability is powered by [rusi (Rust Source Inspector)](https://github.com/appthreat/rusi), a Rust analysis engine that emits a call graph and interprocedural source-to-sink data-flow slices with PURL attribution. dep-scan converts that report into its shared purl-keyed reachability pipeline, so a vulnerable crate that is actually **called** (for example `time::now()` for RUSTSEC-2020-0071) is marked **Reachable** while a crate that is merely present in the BOM but never called is not. See the [Rust reachability guide](https://depscan.readthedocs.io/languages/rust-reachability) for a worked example on the in-repo `rustsec-app` fixture.
-
-**How it runs.** Under `--profile research` (which dep-scan forces when reachability is on), `cdxgen` runs rusi via evinse for Rust projects and persists the full raw rusi report to the `*-semantics.slices.json` path. dep-scan then consumes that persisted report; it does **not** spawn rusi itself when cdxgen and the plugins are available. rusi is invoked directly only as a fallback.
-
-**Enabling it.** Reachability is on by default for Rust (`--reachability-analyzer FrameworkReachability`); `SemanticReachability` additionally attributes reached services and endpoints.
+**Rust (rusi).** cdxgen runs [rusi](https://github.com/cdxgen/cdxgen-plugins-bin) and persists its report, which dep-scan converts into the shared pipeline, so a crate that is actually called (for example `time::now()` for RUSTSEC-2020-0071) is Reachable while one merely present is not. See the [Rust reachability guide](https://depscan.readthedocs.io/languages/rust-reachability).
 
 ```bash
-# rust reachability is automatic; just scan the project
 depscan -i ./my-rust-app -o ./reports --profile research
-
-# point dep-scan at a dev build of rusi
-DEPSCAN_RUSI_BINARY=/path/to/rusi depscan -i ./my-rust-app -o ./reports
 ```
 
-**Locating the rusi binary.** dep-scan resolves rusi the same way cdxgen does: the `RUSI_CMD` env var, then `DEPSCAN_RUSI_BINARY`, then `rusi` on `PATH`, then the bundled `cdxgen-plugins-bin` layout (`<pluginsDir>/rusi/rusi-<platform>-<arch>`). When cdxgen spawns, dep-scan propagates `RUSI_CMD` and `CDXGEN_PLUGINS_DIR` to the subprocess so both sides use the same binary. If rusi cannot be found, Rust reachability is skipped with a warning (never a crash); other languages are unaffected.
-
-**Backend safety.** The default `stable` backend (`--rust-analyzer-backend stable`) is syn-based parsing only and is safe on untrusted repositories. The `compiler` backend (`--rust-analyzer-backend compiler`, also implied by `--deep`) embeds nightly rustc and builds the target (runs `cargo`/`rustc`), so it is enabled only via explicit opt-in; consult the rusi threat model before pointing it at untrusted code.
-
-### Go reachability (via golem)
-
-Go reachability is powered by [golem (Go Source Inspector)](https://github.com/cdxgen/cdxgen-plugins-bin), a Go static-analysis engine shipped prebuilt via cdxgen-plugins-bin. golem emits a call graph, interprocedural source-to-sink data-flow slices, API endpoints, and symbol-usage evidence with PURL attribution. dep-scan converts that report into its shared purl-keyed reachability pipeline, so a vulnerable module that is actually **called** (for example `pgx.Connect` for a SQL-injection CVE) is marked **Reachable** while a module that is merely present in the BOM but never called is not. See the [Go reachability guide](https://depscan.readthedocs.io/languages/go-reachability) for a worked example on the in-repo `real-cve-app` fixture.
-
-**How it runs.** dep-scan invokes golem directly when a Go project is detected (`-t go`) and reachability is on. golem requires a local Go toolchain (`go` on `PATH`) to load packages. The `--include-all-flows` flag is always passed so dependency-internal flows (the CVE-reachability signal) are retained.
-
-**Enabling it.** Reachability is on by default for Go (`--reachability-analyzer FrameworkReachability`); `SemanticReachability` additionally attributes reached services and endpoints.
+**Go (golem).** dep-scan invokes [golem](https://github.com/cdxgen/cdxgen-plugins-bin) directly for Go projects (needs `go` on `PATH`), marking a module Reachable when its functions are on a traced path. Use `--go-analyzer-network offline` for untrusted repos with a warm module cache. See the [Go reachability guide](https://depscan.readthedocs.io/languages/go-reachability).
 
 ```bash
-# go reachability is automatic; just scan the project
 depscan -i ./my-go-app -o ./reports -t go
-
-# point dep-scan at a specific golem binary
-DEPSCAN_GOLEM_BINARY=/path/to/golem depscan -i ./my-go-app -o ./reports -t go
-
-# forbid network access during analysis (requires warm module cache)
-depscan -i ./my-go-app -o ./reports -t go --go-analyzer-network offline
 ```
 
-**Locating the golem binary.** dep-scan resolves golem the same way cdxgen does: the `GOLEM_CMD` env var, then `DEPSCAN_GOLEM_BINARY`, then `golem` on `PATH`, then the bundled `cdxgen-plugins-bin` layout (`<pluginsDir>/golem/golem-<platform>-<arch>`). When cdxgen spawns, dep-scan propagates `GOLEM_CMD` and `CDXGEN_PLUGINS_DIR` to the subprocess so both sides use the same binary. If golem or the Go toolchain cannot be found, Go reachability is skipped with a warning (never a crash); other languages are unaffected.
-
-**Safety.** golem loads packages via `golang.org/x/tools/go/packages` with full type/SSA info but does **not** run the program and does **not** run `go:generate`. Package loading uses the local Go toolchain, so module downloads can occur depending on the Go env. dep-scan defaults to `GOFLAGS=-mod=readonly` to prevent `go.mod` rewrites on untrusted repos. Use `--go-analyzer-network offline` (sets `GOPROXY=off`) to forbid all downloads; this requires a warm module cache (`GOMODCACHE`).
-
-### .NET reachability (via dosai)
-
-.NET reachability (C#/VB/F#/R) is powered by [dosai (Dotnet Source and Assembly Inspector)](https://github.com/owasp-dep-scan/dosai), a .NET analysis engine shipped prebuilt via cdxgen-plugins-bin. dosai inspects source (Roslyn) and assemblies (Reflection + IL) and emits a call graph, interprocedural source-to-sink data-flow slices, explicit per-package reachability (`PackageReachability` with `ReachabilityKind` and `Confidence`), weakness candidates (CWE-tagged), and dangerous-API reachability. dep-scan consumes dosai's **native** facts directly for the reachability verdict and emits an atom-shaped projection so a vulnerable NuGet package that is actually **called** (for example `Newtonsoft.Json.JsonConvert.DeserializeObject` on a controlled input) is marked **Reachable** while a package that is merely referenced but never called is not. See the [.NET reachability guide](https://depscan.readthedocs.io/languages/dotnet-reachability) for a worked example on the in-repo `reachable-app` and `unreachable-app` fixtures.
-
-**How it runs.** Under `--profile research` (forced when reachability is on), `cdxgen` runs dosai and persists the combined native report `{Metadata, methods, dataflows}` to the `*-semantics.slices.json` path. dep-scan consumes that persisted report (the PRIMARY path) and does **not** spawn dosai itself when cdxgen and the plugins are available. dosai is invoked directly only as a fallback (`dataflows` + `methods` with `--pattern-packs all`).
-
-**Enabling it.** Reachability is on by default for .NET projects (`-t dotnet`, `--reachability-analyzer FrameworkReachability`); `SemanticReachability` additionally attributes reached services and endpoints.
+**.NET (dosai).** cdxgen runs [dosai](https://github.com/owasp-dep-scan/dosai), which emits an explicit per-package reachability verdict (`PackageReachability` with `ReachabilityKind` and `Confidence`) that dep-scan treats as authoritative, so a NuGet package actually called (for example `JsonConvert.DeserializeObject` on a controlled input) is Reachable. Scan a restored tree for versioned purls. See the [.NET reachability guide](https://depscan.readthedocs.io/languages/dotnet-reachability).
 
 ```bash
-# .NET reachability is automatic; just scan the project
 depscan -i ./my-dotnet-app -o ./reports -t dotnet
-
-# point dep-scan at a specific dosai binary
-DEPSCAN_DOSAI_BINARY=/path/to/dosai depscan -i ./my-dotnet-app -o ./reports -t dotnet
-
-# prefer source vs assembly inspection explicitly
-depscan -i ./my-dotnet-app -o ./reports -t dotnet --dotnet-analyzer-mode source
 ```
 
-**Locating the dosai binary.** dep-scan resolves dosai the same way cdxgen does: the `DOSAI_CMD` env var, then `DEPSCAN_DOSAI_BINARY`, then `dosai`/`Dosai` on `PATH`, then the bundled `cdxgen-plugins-bin` layout (`<pluginsDir>/dosai/dosai-<platform>-<arch>`). When cdxgen spawns, dep-scan propagates `DOSAI_CMD` and `CDXGEN_PLUGINS_DIR` to the subprocess so both sides use the same binary. If dosai cannot be found, .NET reachability is skipped with a warning (never a crash); other languages are unaffected.
-
-**Runtime requirement.** dosai needs a .NET runtime to load; dep-scan probes `dotnet --version` and skips gracefully with a diagnostic when absent. A self-contained `-full` dosai binary (from the [dosai releases](https://github.com/owasp-dep-scan/dosai/releases)) bundles the runtime and needs no SDK. For best versioned NuGet purls, scan a **restored** tree (`project.assets.json` / `*.deps.json` present); dosai falls back to versionless `System.*` framework purls otherwise. dep-scan does **not** run `dotnet restore` itself (untrusted-repo/network risk).
-
-### JVM, JavaScript, Python, and PHP reachability (via atom)
-
-Java and the wider JVM (Groovy, Kotlin, Scala), JavaScript and TypeScript, Python, and PHP share a single slicer, [atom](https://github.com/AppThreat/atom), which builds a language-agnostic intermediate representation and performs static slicing for reachability and usages. dep-scan consumes the resulting `*-reachables.slices.json` to mark vulnerable packages **Reachable** when they sit on a traced data-flow or call-graph path. See the [JVM, JS, Python, and PHP reachability guide](https://depscan.readthedocs.io/languages/jvm-js-python-php-reachability) for the per-language commands and the workflow to move from `FrameworkReachability` to `SemanticReachability`.
-
-**Enabling it.** Use the `research` profile so cdxgen persists the atom slices; reachability is then on by default. Pass `--explain` for a detailed flow breakdown.
+**JVM, JavaScript/TypeScript, Python, and PHP (atom).** These four ecosystems share the [atom](https://github.com/AppThreat/atom) slicer, which builds a language-agnostic intermediate representation and performs static slicing. See the [JVM, JS, Python, and PHP reachability guide](https://depscan.readthedocs.io/languages/jvm-js-python-php-reachability).
 
 ```bash
-# Java / JVM
 depscan --profile research -t java -i ./my-java-app -o ./reports --explain
-
-# JavaScript / TypeScript
-depscan --profile research -t js -i ./my-js-app -o ./reports --explain
-
-# Python
-depscan --profile research -t python -i ./my-python-app -o ./reports --explain
-
-# PHP (ensure PHP >= 7.4 is installed, or use the container image)
-depscan --profile research -t php -i ./my-php-app -o ./reports --explain
 ```
 
-`SemanticReachability` adds endpoint, service, and post-build reachability tiers, which need lifecycle BOMs. The recommended workflow is to build the project and container images, generate the BOMs, and run dep-scan with `--bom-dir`. See the [semantic reachability guide](https://depscan.readthedocs.io/analyzers/semantic-reachability) for the full workflow.
+To move beyond framework-forward reachability to endpoint, service, and post-build tiers, pass `--reachability-analyzer SemanticReachability` with a `--bom-dir` of lifecycle BOMs. See the [semantic reachability guide](https://depscan.readthedocs.io/analyzers/semantic-reachability).
 
 ### Clear insights about CVEs
 
