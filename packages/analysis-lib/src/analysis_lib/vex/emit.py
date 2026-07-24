@@ -22,13 +22,15 @@ from importlib import resources
 from typing import Any, Dict, List, Optional, Tuple
 
 import toml
-from jsonschema import Draft202012Validator, validators
+from jsonschema import Draft202012Validator, FormatChecker, validators
 from jsonschema.exceptions import ValidationError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
 from analysis_lib import get_version
 from analysis_lib.vex.csaf import build_csaf
+from analysis_lib.vex.dates import is_rfc3339
+from analysis_lib.vex.semantic import validate_semantic
 
 LOG = logging.getLogger(__name__)
 
@@ -55,6 +57,20 @@ def _multiple_of(validator, divisor, instance, schema):
 # Validator that keeps CSAF's Draft 2020-12 semantics but uses the exact
 # ``multipleOf`` above so valid CVSS scores are never rejected.
 CsafValidator = validators.extend(Draft202012Validator, {"multipleOf": _multiple_of})
+
+# jsonschema only checks ``format: date-time`` when an optional RFC 3339 library
+# is installed; without it the check is a silent no-op (this is why timezone-less
+# timestamps passed validation in issue #511). We register our own RFC 3339
+# check so ``date-time`` is always enforced, with no extra dependency.
+CSAF_FORMAT_CHECKER = FormatChecker()
+
+
+@CSAF_FORMAT_CHECKER.checks("date-time")
+def _check_date_time(value: Any) -> bool:
+    if not isinstance(value, str):
+        return True
+    return is_rfc3339(value)
+
 
 SCHEMA_FILES = {
     "2.0": "csaf_2.0_json_schema.json",
@@ -110,18 +126,27 @@ def load_schema(csaf_version: str = "2.1") -> Dict[str, Any]:
 
 
 def validate(doc: Dict[str, Any], csaf_version: str = "2.1") -> List[str]:
-    """Return a list of human-readable schema error messages (empty == valid).
+    """Return human-readable validation error messages (empty == valid).
 
-    CVSS ``$ref`` URLs are resolved against bundled copies so validation never
-    touches the network.
+    Runs two layers so a document that merely satisfies the JSON Schema is not
+    mistaken for a conformant one:
+
+    * the bundled official CSAF JSON Schema (with an RFC 3339 ``date-time``
+      format check and bundled CVSS ``$ref`` copies -- no network access), and
+    * the CSAF §6.1 mandatory *semantic* tests the schema cannot express
+      (see :mod:`analysis_lib.vex.semantic`).
     """
     schema = load_schema(csaf_version)
-    validator = CsafValidator(schema, registry=_cvss_registry())
+    validator = CsafValidator(
+        schema, registry=_cvss_registry(), format_checker=CSAF_FORMAT_CHECKER
+    )
     errors = sorted(
         validator.iter_errors(doc),
         key=lambda e: list(e.path),
     )
-    return [f"{'/'.join(str(p) for p in e.path) or '<doc>'}: {e.message}" for e in errors]
+    messages = [f"{'/'.join(str(p) for p in e.path) or '<doc>'}: {e.message}" for e in errors]
+    messages.extend(validate_semantic(doc, csaf_version))
+    return messages
 
 
 def output_path(bom_file: str, reports_dir: str) -> str:

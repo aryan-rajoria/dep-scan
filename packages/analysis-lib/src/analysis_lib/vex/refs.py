@@ -11,19 +11,72 @@ Schema rules enforced here:
 """
 
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from analysis_lib.config import REF_MAP
 from analysis_lib.utils import get_ref_summary_helper
 
 _CVE_RE = re.compile(r"CVE-\d{4}-\d{4,7}", re.IGNORECASE)
-# Advisory tokens worth surfacing as CSAF ids (GHSA, RHSA, CVE, etc.). The
-# character class is case-insensitive; the matched token is uppercased.
+# Advisory prefixes worth surfacing as CSAF ids, mapped to the issuing
+# system_name required by the CSAF ``ids`` schema. Distro advisories
+# (DLA/DSA/ELSA/ALAS/USN/...) are included so items that carry only such an
+# identifier are never left without a CSAF vulnerability id (§6.1.27).
+_ADVISORY_SYSTEMS = {
+    "CVE": "MITRE CVE",
+    "GHSA": "GitHub Security Advisory",
+    "RHSA": "Red Hat Security Advisory",
+    "RHBA": "Red Hat Bug Advisory",
+    "DSA": "Debian Security Advisory",
+    "DLA": "Debian LTS Advisory",
+    "USN": "Ubuntu Security Notice",
+    "ELSA": "Oracle Linux Security Advisory",
+    "ELBA": "Oracle Linux Bug Advisory",
+    "ALAS": "Amazon Linux Security Advisory",
+    "ALAS2": "Amazon Linux 2 Security Advisory",
+    "ALBA": "AlmaLinux Bug Advisory",
+    "ALSA": "AlmaLinux Security Advisory",
+    "ALS2": "AlmaLinux 2 Security Advisory",
+    "ASFA": "AlmaLinux SIG Advisory",
+    "GLSA": "Gentoo Linux Security Advisory",
+    "MGASA": "Mageia Security Advisory",
+    "SUSE-SU": "SUSE Security Update",
+    "OPENSUSE-SU": "openSUSE Security Update",
+    "FEDORA": "Fedora Update Advisory",
+    "NTAP": "NetApp Advisory",
+    "ZDI": "Zero Day Initiative Advisory",
+}
 _ADVISORY_TOKEN_RE = re.compile(
-    r"\b((?:GHSA|RHSA|RHBA|DSA|USN|NTAP|ZDI|CVE|ALBA|ALS2|ASFA)-[0-9A-Za-z:\-]{4,})\b"
+    r"\b((?:"
+    + "|".join(sorted(_ADVISORY_SYSTEMS, key=len, reverse=True))
+    + r")-[0-9A-Za-z:.\-]{2,})\b",
+    re.IGNORECASE,
 )
 _VALID_SCHEMES = {"http", "https"}
+
+
+def _system_name_for(token: str) -> str:
+    """Map an advisory token (e.g. ``DLA-4485-1``) to its issuing system."""
+    upper = token.upper()
+    for prefix in sorted(_ADVISORY_SYSTEMS, key=len, reverse=True):
+        if upper.startswith(prefix + "-"):
+            return _ADVISORY_SYSTEMS[prefix]
+    if _CVE_RE.match(token):
+        return _ADVISORY_SYSTEMS["CVE"]
+    return "Advisory"
+
+
+def synthesize_id(source: str) -> Optional[Dict[str, str]]:
+    """Extract a CSAF ``ids`` entry from a raw id/title string, or ``None``.
+
+    Used as a last-resort so a vulnerability whose only identifier lives in its
+    ``id``/``title`` (distro advisories like ``DLA-4485-1``) still satisfies
+    §6.1.27 (each item must carry at least one of ``cve``/``ids``).
+    """
+    token = _extract_advisory_token(source or "", source or "")
+    if not token:
+        return None
+    return {"system_name": _system_name_for(token), "text": token.upper()}
 
 
 def _is_real_url(url: str) -> bool:

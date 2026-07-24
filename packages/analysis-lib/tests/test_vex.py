@@ -22,9 +22,12 @@ from analysis_lib.vex.product_tree import (
     referenced_product_ids,
     resolve_purl,
 )
+from analysis_lib.vex.dates import is_rfc3339, now_csaf, to_csaf_datetime
 from analysis_lib.vex.reachability import classify, KNOWN_AFFECTED, KNOWN_NOT_AFFECTED
-from analysis_lib.vex.refs import build_references_and_ids
+from analysis_lib.vex.refs import build_references_and_ids, synthesize_id
+from analysis_lib.vex.semantic import validate_semantic
 from analysis_lib.vex.tracking import build_tracking
+from analysis_lib.vex.vulnerabilities import build_vulnerability
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -682,6 +685,331 @@ JUICE_SHOP_SLICES = os.path.join(JUICE_SHOP_DIR, "reports", "js-reachables.slice
 juice_shop_present = all(
     os.path.exists(p) for p in (JUICE_SHOP_BOM, JUICE_SHOP_VDR, JUICE_SHOP_SLICES)
 )
+
+
+# ---------------------------------------------------------------------------
+# Issue #511: CSAF §6.1 semantic compliance
+# ---------------------------------------------------------------------------
+def test_dates_normalize_to_rfc3339_utc_z():
+    # Naive timestamps (the #511 bug) gain a Z; offsets convert to UTC.
+    assert to_csaf_datetime("2026-07-24T03:45:16") == "2026-07-24T03:45:16Z"
+    assert to_csaf_datetime("2025-07-01T17:15:30") == "2025-07-01T17:15:30Z"
+    assert to_csaf_datetime("2026-07-24T12:27:58+09:00") == "2026-07-24T03:27:58Z"
+    assert to_csaf_datetime("2026-07-24T03:45:16Z") == "2026-07-24T03:45:16Z"
+    assert is_rfc3339(now_csaf())
+    assert to_csaf_datetime("") is None
+    assert to_csaf_datetime("not-a-date", "2020-01-01T00:00:00") == "2020-01-01T00:00:00Z"
+
+
+def test_is_rfc3339_rejects_missing_timezone():
+    assert not is_rfc3339("2026-07-24T03:45:16")
+    assert is_rfc3339("2026-07-24T03:45:16Z")
+    assert is_rfc3339("2026-07-24T03:45:16+09:00")
+
+
+def test_tracking_dates_are_rfc3339():
+    t = build_tracking({"initial_release_date": "2026-07-24T03:45:16"}).to_dict()
+    assert is_rfc3339(t["initial_release_date"])
+    assert is_rfc3339(t["current_release_date"])
+    assert is_rfc3339(t["revision_history"][0]["date"])
+
+
+def test_synthesize_id_for_distro_advisory():
+    got = synthesize_id("DLA-4485-1/pkg:deb/debian/ca-certificates@20210119")
+    assert got == {"system_name": "Debian LTS Advisory", "text": "DLA-4485-1"}
+    assert synthesize_id("USN-1234-5") == {
+        "system_name": "Ubuntu Security Notice",
+        "text": "USN-1234-5",
+    }
+    assert synthesize_id("just a title with no id") is None
+
+
+def test_vulnerability_without_cve_gets_synthesized_id():
+    # A distro advisory whose only id lives in title must still carry an id
+    # (§6.1.27.8).
+    vuln = {
+        "id": "DLA-4485-1/pkg:deb/debian/curl@7.74.0",
+        "bom-ref": "DLA-4485-1/pkg:deb/debian/curl@7.74.0",
+        "affects": [{"ref": "pkg:deb/debian/curl@7.74.0"}],
+    }
+    purl_to_id = {"pkg:deb/debian/curl@7.74.0": "pkg:deb/debian/curl@7.74.0"}
+    model = build_vulnerability(vuln, purl_to_id, {"pkg:deb/debian/curl@7.74.0": 1}, "2.1")
+    assert model is not None
+    assert model.cve is None
+    assert model.ids and model.ids[0]["text"] == "DLA-4485-1"
+
+
+def test_scores_deduped_per_cvss_version():
+    # Two different v3.1 vectors on the same product -> only one v3 score
+    # (§6.1.7).
+    vuln = {
+        "id": "CVE-2024-0001",
+        "bom-ref": "CVE-2024-0001/pkg:deb/debian/nghttp2@1.43.0-1",
+        "ratings": [
+            {"vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"},
+            {"vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+        ],
+        "affects": [{"ref": "pkg:deb/debian/nghttp2@1.43.0-1"}],
+    }
+    pid = "pkg:deb/debian/nghttp2@1.43.0-1"
+    model = build_vulnerability(vuln, {pid: pid}, {pid: 1}, "2.1")
+    v3_scores = [s for s in model.scores if s.cvss_v3]
+    assert len(v3_scores) == 1
+
+
+def _clean_doc():
+    bom = _load_demo()
+    return build_csaf(bom, bom["vulnerabilities"], reached_purls={}, csaf_version="2.1")
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_generated_document_passes_all_semantic_tests(version):
+    bom = _load_demo()
+    doc = build_csaf(bom, bom["vulnerabilities"], reached_purls={}, csaf_version=version)
+    assert validate_semantic(doc, version) == []
+
+
+def test_semantic_catches_naive_datetime():
+    doc = _clean_doc()
+    doc["document"]["tracking"]["current_release_date"] = "2026-07-24T03:45:16"
+    errs = validate_semantic(doc, "2.1")
+    assert any(e.startswith("6.1.37") and "current_release_date" in e for e in errs)
+
+
+def test_semantic_catches_missing_vuln_id():
+    doc = _clean_doc()
+    doc["vulnerabilities"][0].pop("cve", None)
+    doc["vulnerabilities"][0].pop("ids", None)
+    errs = validate_semantic(doc, "2.1")
+    assert any(e.startswith("6.1.27.8") for e in errs)
+
+
+def test_semantic_catches_duplicate_cvss_version_per_product():
+    doc = _clean_doc()
+    vuln = doc["vulnerabilities"][0]
+    metric = {
+        "products": ["pkg:npm/express@4.22.2"],
+        "content": {"cvss_v3": {"version": "3.1", "baseScore": 5.0}},
+    }
+    vuln["metrics"] = [metric, dict(metric)]
+    vuln["product_status"] = {"known_affected": ["pkg:npm/express@4.22.2"]}
+    errs = validate_semantic(doc, "2.1")
+    assert any(e.startswith("6.1.7") for e in errs)
+
+
+def test_semantic_catches_dangling_and_contradicting_status():
+    doc = _clean_doc()
+    vuln = doc["vulnerabilities"][0]
+    vuln["product_status"] = {
+        "known_affected": ["pkg:npm/ghost@1.0.0"],
+        "known_not_affected": ["pkg:npm/ghost@1.0.0"],
+    }
+    errs = validate_semantic(doc, "2.1")
+    assert any(e.startswith("6.1.1") for e in errs)  # dangling
+    assert any(e.startswith("6.1.6") for e in errs)  # contradiction
+
+
+def test_semantic_catches_multiple_use_of_same_cve():
+    doc = _clean_doc()
+    doc["vulnerabilities"][1]["cve"] = doc["vulnerabilities"][0]["cve"]
+    errs = validate_semantic(doc, "2.1")
+    assert any(e.startswith("6.1.23") for e in errs)
+
+
+def test_semantic_catches_inconsistent_cvss_severity():
+    doc = _clean_doc()
+    vuln = doc["vulnerabilities"][0]
+    vuln["product_status"] = {"known_affected": ["pkg:npm/express@4.22.2"]}
+    vuln["metrics"] = [
+        {
+            "products": ["pkg:npm/express@4.22.2"],
+            "content": {
+                "cvss_v3": {
+                    "version": "3.1",
+                    "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+                    "baseScore": 9.8,
+                    "baseSeverity": "LOW",
+                }
+            },
+        }
+    ]
+    errs = validate_semantic(doc, "2.1")
+    assert any(e.startswith("6.1.10") for e in errs)
+
+
+def test_semantic_accepts_lowercase_t_z_as_invalid():
+    # §2.3 requires upper-case T and Z.
+    assert not is_rfc3339("2026-07-24t03:45:16z")
+    assert is_rfc3339("2026-07-24T03:45:16Z")
+
+
+def test_semantic_allows_recommended_overlap_but_flags_real_contradiction():
+    doc = _clean_doc()
+    vuln = doc["vulnerabilities"][0]
+    pid = "pkg:npm/express@4.22.2"
+    # recommended may overlap known_affected -> no contradiction.
+    vuln["product_status"] = {"known_affected": [pid], "recommended": [pid]}
+    vuln["remediations"] = [{"category": "none_available", "details": "x", "product_ids": [pid]}]
+    assert not any(e.startswith("6.1.6") for e in validate_semantic(doc, "2.1"))
+    # fixed + known_affected is a genuine contradiction.
+    vuln["product_status"] = {"known_affected": [pid], "fixed": [pid]}
+    assert any(e.startswith("6.1.6") for e in validate_semantic(doc, "2.1"))
+
+
+def test_semantic_allows_unknown_status_value():
+    doc = _clean_doc()
+    vuln = doc["vulnerabilities"][0]
+    pid = "pkg:npm/express@4.22.2"
+    vuln["product_status"] = {"under_investigation": [pid], "unknown": [pid]}
+    assert not any("unknown status" in e for e in validate_semantic(doc, "2.1"))
+
+
+def test_semantic_flag_with_group_ids_is_accepted():
+    doc = _clean_doc()
+    vuln = doc["vulnerabilities"][0]
+    vuln["flags"] = [{"label": "component_not_present", "group_ids": ["grp-1"]}]
+    assert not any(e.startswith("6.1.32") for e in validate_semantic(doc, "2.1"))
+
+
+def test_semantic_scores_from_distinct_sources_not_flagged():
+    doc = _clean_doc()
+    vuln = doc["vulnerabilities"][0]
+    pid = "pkg:npm/express@4.22.2"
+    vuln["product_status"] = {"known_affected": [pid]}
+    vuln["remediations"] = [{"category": "none_available", "details": "x", "product_ids": [pid]}]
+    vuln["metrics"] = [
+        {
+            "products": [pid],
+            "source": "nvd",
+            "content": {"cvss_v3": {"version": "3.1", "baseScore": 5.0}},
+        },
+        {
+            "products": [pid],
+            "source": "debian",
+            "content": {"cvss_v3": {"version": "3.1", "baseScore": 5.0}},
+        },
+    ]
+    assert not any(e.startswith("6.1.7") for e in validate_semantic(doc, "2.1"))
+
+
+def test_known_affected_gets_remediation_action_statement():
+    bom = _load_demo()
+    reached = {"pkg:npm/express@4.22.2": 3}
+    doc = build_csaf(bom, bom["vulnerabilities"], reached_purls=reached, csaf_version="2.1")
+    affected = [
+        v
+        for v in doc["vulnerabilities"]
+        if "pkg:npm/express@4.22.2" in (v.get("product_status") or {}).get("known_affected", [])
+    ]
+    assert affected, "expected express to be known_affected"
+    for v in affected:
+        rem_products = {p for r in v.get("remediations", []) for p in r.get("product_ids", [])}
+        assert "pkg:npm/express@4.22.2" in rem_products
+    # And the full document passes every semantic test.
+    assert validate_semantic(doc, "2.1") == []
+
+
+def test_semantic_catches_missing_action_statement():
+    doc = _clean_doc()
+    vuln = doc["vulnerabilities"][0]
+    vuln["product_status"] = {"known_affected": ["pkg:npm/express@4.22.2"]}
+    vuln.pop("remediations", None)
+    assert any(e.startswith("6.1.27.10") for e in validate_semantic(doc, "2.1"))
+
+
+def test_vex_profile_tests_do_not_fire_for_security_advisory():
+    # A csaf_security_advisory legitimately uses first_affected and needs no
+    # VEX action statement -- the §6.1.27.x tests must not fire.
+    doc = _clean_doc()
+    doc["document"]["category"] = "csaf_security_advisory"
+    vuln = doc["vulnerabilities"][0]
+    vuln["product_status"] = {"first_affected": ["pkg:npm/express@4.22.2"]}
+    vuln.pop("remediations", None)
+    errs = validate_semantic(doc, "2.1")
+    assert not any(e.startswith("6.1.27") for e in errs)
+
+
+def test_impact_statement_satisfied_via_group_ids():
+    doc = _clean_doc()
+    pid = "pkg:npm/express@4.22.2"
+    doc["product_tree"]["product_groups"] = [{"group_id": "grp-1", "product_ids": [pid]}]
+    vuln = doc["vulnerabilities"][0]
+    vuln["product_status"] = {"known_not_affected": [pid]}
+    # Flag references the product only through its group.
+    vuln["flags"] = [{"label": "component_not_present", "group_ids": ["grp-1"]}]
+    assert not any(e.startswith("6.1.27.9") for e in validate_semantic(doc, "2.1"))
+
+
+def test_action_statement_satisfied_via_group_ids():
+    doc = _clean_doc()
+    pid = "pkg:npm/express@4.22.2"
+    doc["product_tree"]["product_groups"] = [{"group_id": "grp-1", "product_ids": [pid]}]
+    vuln = doc["vulnerabilities"][0]
+    vuln["product_status"] = {"known_affected": [pid]}
+    vuln["remediations"] = [{"category": "vendor_fix", "details": "x", "group_ids": ["grp-1"]}]
+    assert not any(e.startswith("6.1.27.10") for e in validate_semantic(doc, "2.1"))
+
+
+def test_released_status_flags_zero_revision_entry():
+    # §6.1.18: a final document may not carry a revision-history entry with a
+    # zero version number.
+    doc = _clean_doc()
+    tracking = doc["document"]["tracking"]
+    tracking["status"] = "final"
+    tracking["version"] = "2"
+    tracking["revision_history"] = [
+        {"number": "0", "date": "2026-07-24T00:00:00Z", "summary": "draft"},
+        {"number": "2", "date": "2026-07-24T01:00:00Z", "summary": "release"},
+    ]
+    assert any(e.startswith("6.1.18") for e in validate_semantic(doc, "2.1"))
+
+
+def test_semantic_flags_prerelease_revision_number():
+    # §6.1.19: no revision number may carry pre-release information.
+    doc = _clean_doc()
+    doc["document"]["tracking"]["revision_history"][0]["number"] = "1.0.0-rc1"
+    doc["document"]["tracking"]["version"] = "1.0.0-rc1"
+    assert any(e.startswith("6.1.19") for e in validate_semantic(doc, "2.1"))
+
+
+def test_semantic_allows_build_metadata_hyphen_for_final():
+    # §3.1.11.2: build metadata (after '+') is allowed for final docs even
+    # when it contains a hyphen; it is not pre-release information.
+    doc = _clean_doc()
+    tracking = doc["document"]["tracking"]
+    tracking["status"] = "final"
+    tracking["version"] = "1.0.0+build-2"
+    tracking["revision_history"] = [
+        {"number": "1.0.0+build-2", "date": "2026-07-24T00:00:00Z", "summary": "release"}
+    ]
+    errs = validate_semantic(doc, "2.1")
+    assert not any(e.startswith("6.1.17") for e in errs)
+    assert not any(e.startswith("6.1.19") for e in errs)
+
+
+def test_semantic_flags_vex_vuln_without_product_status():
+    # §6.1.27.7: a VEX vulnerability with no core status (empty product_status)
+    # must be flagged.
+    doc = _clean_doc()
+    doc["vulnerabilities"][0]["product_status"] = {}
+    assert any(e.startswith("6.1.27.7") for e in validate_semantic(doc, "2.1"))
+
+
+def test_semantic_unknown_status_uses_schema_label_not_6_1_6():
+    doc = _clean_doc()
+    doc["vulnerabilities"][0]["product_status"] = {"bogus_status": ["pkg:npm/express@4.22.2"]}
+    errs = validate_semantic(doc, "2.1")
+    assert any(e.startswith("schema") and "unknown status" in e for e in errs)
+    assert not any(e.startswith("6.1.6") and "unknown status" in e for e in errs)
+
+
+def test_validate_end_to_end_flags_naive_datetime_via_format_checker():
+    # Even a schema-valid document must fail validate() when a timestamp lacks
+    # a timezone -- the regression that shipped in #511.
+    doc = _clean_doc()
+    doc["document"]["tracking"]["current_release_date"] = "2026-07-24T03:45:16"
+    errs = validate(doc, "2.1")
+    assert errs, "expected validate() to report the naive datetime"
 
 
 @pytest.mark.skipif(not juice_shop_present, reason="juice-shop fixtures not available")

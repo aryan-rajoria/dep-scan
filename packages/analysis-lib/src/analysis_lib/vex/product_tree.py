@@ -131,7 +131,8 @@ def referenced_product_ids(doc: Dict[str, Any]) -> set:
     for vuln in doc.get("vulnerabilities", []) or []:
         for ids in (vuln.get("product_status") or {}).values():
             referenced.update(ids)
-        for score in vuln.get("scores", []) or []:
+        # CSAF 2.0 stores scores under ``scores``; 2.1 under ``metrics``.
+        for score in (vuln.get("scores") or []) + (vuln.get("metrics") or []):
             referenced.update(score.get("products", []) or [])
         for flag in vuln.get("flags", []) or []:
             referenced.update(flag.get("product_ids", []) or [])
