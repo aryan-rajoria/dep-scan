@@ -42,6 +42,17 @@ The toml sets the metadata outside the vulnerabilities section. The required fie
 
 Tracking has a few invariants worth knowing. The `revision_history` is always non-empty because CSAF requires at least one revision entry even for draft documents. The document `version` equals the latest revision number. If you leave dates blank, dep-scan uses the current UTC time. The `id` is best set by your issuing authority; when left blank, dep-scan generates one from the date and version.
 
+The fields are summarized below; required fields are in **bold**.
+
+| TOML field | Subcategories | Notes |
+|---|---|---|
+| **document** | **category**<br/>**title** | default category is `csaf_vex`. |
+| **publisher** | **category**<br/>**name**<br/>**namespace**<br/>contact_details | valid categories: coordinator, discoverer, other, translator, user, vendor. |
+| note | **category**<br/>**text**<br/>audience<br/>title | notes without `text` are dropped (CSAF requires non-empty note text). |
+| reference | **summary**<br/>**url**<br/>category | valid categories: self, external. |
+| **tracking** | **status**<br/>**version**<br/>id<br/>current_release_date<br/>initial_release_date | dates default to now (RFC 3339 UTC); version defaults to the latest revision number. |
+| tracking.revision_history | date<br/>number<br/>summary | the document always carries at least one revision entry. |
+
 ## The reachability-to-status mapping
 
 This is the central compliance story, and it is encoded in `analysis_lib/vex/reachability.py`. The classifier reads the affected purls from each VDR vulnerability and bins them into CSAF `product_status` buckets based on the reached-purls map. The decision, applied per affected purl, is shown below.
@@ -126,18 +137,15 @@ Read the two entries together. The reachable `express` finding carries no flag b
 
 The mapping is language-agnostic because CSAF VEX is purl-keyed. The dep-scan test suite asserts the same behavior for Rust, Go, and .NET: a reached `pkg:cargo`, `pkg:golang`, or `pkg:nuget` purl maps to `known_affected`, while a present-but-unreached purl of any type maps to `known_not_affected` with the execute-path flag. So whether your reachability came from atom, rusi, golem, or dosai, the VEX tells the same compliance story.
 
-## Schema validation
+## Validation: schema plus semantic tests
 
-Every generated document is validated in-process against the official CSAF 2.0 or 2.1 JSON schema bundled with the `analysis_lib.vex` package, so validation runs fully offline. Any validation errors are logged while the document is still written for debugging. Note that CSAF 2.0 has no `cvss_v4` slot, so CVSS v4 vectors are retained only when targeting 2.1; CVSS v2 and v3 are always mapped. Validation resolves the FIRST CVSS schemas from bundled copies, which is why no network access is needed.
+Every generated document is validated in-process through two layers, both fully offline, with any errors logged while the document is still written for debugging.
 
-To validate a document manually, use `check-jsonschema` against the bundled schema:
+The first layer is the official CSAF 2.0 or 2.1 **JSON Schema** bundled with the `analysis_lib.vex` package. dep-scan enforces the `date-time` format with a built-in RFC 3339 check rather than the stock `jsonschema` behavior (which silently skips `date-time` unless an optional library is installed), so a timestamp missing its timezone is treated as a real error. The FIRST CVSS schemas are resolved from bundled copies, which is why no network access is needed. Note that CSAF 2.0 has no `cvss_v4` slot, so CVSS v4 vectors are retained only when targeting 2.1; CVSS v2 and v3 are always mapped.
 
-```bash
-pip install check-jsonschema
-check-jsonschema --schemafile contrib/csaf_2.0_schema.json path/to/your.csaf.json
-```
+The second layer is the set of **CSAF §6.1 mandatory tests** the JSON Schema cannot express, implemented in `analysis_lib.vex.semantic`. A document that merely satisfies the schema can still be non-conformant, so dep-scan additionally checks for missing or duplicate product ids (§6.1.1/§6.1.2), contradicting product status (§6.1.6, with `recommended` permitted to overlap), multiple CVSS scores of the same version *and source* for one product (§6.1.7), invalid or inconsistent CVSS (§6.1.8–§6.1.10), CWE and language and purl validity (§6.1.11–§6.1.13), revision-history consistency (§6.1.14/§6.1.16/§6.1.21/§6.1.22), draft-versus-version status (§6.1.17/§6.1.18/§6.1.20), mixed versioning (§6.1.30), duplicate CVE use (§6.1.23), document category (§6.1.26), RFC 3339 date-time everywhere (§6.1.37), and the VEX profile tests under §6.1.27.x — product status (§6.1.27.7), vulnerability id (§6.1.27.8), impact statement for `known_not_affected` (§6.1.27.9), and action statement for `known_affected` (§6.1.27.10) — plus remediation and flag product references (§6.1.29/§6.1.32/§6.1.33). The VEX profile tests are gated on `document.category == "csaf_vex"`, so they never fire against other CSAF categories such as `csaf_security_advisory`. To keep the document conformant by construction, dep-scan normalizes every timestamp to RFC 3339 UTC (`...Z`), guarantees each vulnerability carries at least one of `cve` or `ids` (distro advisories such as `DLA-4485-1` get an `ids` synthesized from their advisory token), and gives every `known_affected` product a `remediations` action statement (`vendor_fix` when a fix is recommended, otherwise `none_available`).
 
-dep-scan also ships `contrib/vex-validate.py` as a convenience validator for generated documents.
+The same two-layer validation is available as a standalone command, `depscan-validate`, so you can check documents after the fact — including documents produced by other tools. It is documented in [Validating VEX and VDR documents](validate-command).
 
 ## CSAF 2.0 versus 2.1
 

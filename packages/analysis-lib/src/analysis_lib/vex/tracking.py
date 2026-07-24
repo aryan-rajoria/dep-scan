@@ -6,32 +6,21 @@ latest revision number. This module builds a tracking block that always
 contains at least the initial revision entry.
 """
 
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from vdb.lib import convert_time
-
-from analysis_lib.config import TIME_FMT
+from analysis_lib.vex.dates import now_csaf, to_csaf_datetime
 from analysis_lib.vex.models import RevisionEntry, Tracking
 
 INITIAL_SUMMARY = "Initial"
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).strftime(TIME_FMT)
+    return now_csaf()
 
 
 def _fmt_date(value: Optional[str], fallback: str) -> str:
-    """Normalize an ISO-ish date to CSAF's ``YYYY-MM-DDTHH:MM:SS`` form."""
-    if not value:
-        return fallback
-    try:
-        converted = convert_time(value)
-        if converted is None:
-            return fallback
-        return converted.strftime(TIME_FMT)
-    except Exception:
-        return fallback
+    """Normalize an ISO-ish date to a CSAF RFC 3339 timestamp (UTC ``Z``)."""
+    return to_csaf_datetime(value, fallback) or fallback
 
 
 def build_tracking(raw: Optional[Dict[str, Any]], generated_id: str = "") -> Tracking:

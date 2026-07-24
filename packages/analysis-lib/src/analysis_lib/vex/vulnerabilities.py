@@ -18,11 +18,12 @@ from typing import Any, Dict, List, Optional
 
 from analysis_lib.config import CWE_MAP
 from analysis_lib.vex.cvss import parse_ratings
+from analysis_lib.vex.dates import to_csaf_datetime
 from analysis_lib.vex.models import Flag, Note, Reference, Score, Vulnerability
 from analysis_lib.vex.reachability import classify
-from analysis_lib.vex.refs import build_references_and_ids
+from analysis_lib.vex.refs import build_references_and_ids, synthesize_id
 
-_DESCRIPCTION_CATEGORY = "description"
+_DESCRIPTION_CATEGORY = "description"
 _DETAILS_CATEGORY = "details"
 _OTHER_CATEGORY = "other"
 
@@ -68,7 +69,7 @@ def _build_notes(vuln: Dict[str, Any], extra_cwe_notes: List[Note]) -> List[Note
 
     description = (vuln.get("description") or "").replace("\n", " ").strip()
     if description:
-        notes.append(Note(category=_DESCRIPCTION_CATEGORY, text=description))
+        notes.append(Note(category=_DESCRIPTION_CATEGORY, text=description))
     detail = (vuln.get("detail") or "").replace("\n", " ").strip()
     if detail:
         notes.append(Note(category=_DETAILS_CATEGORY, text=detail))
@@ -118,26 +119,27 @@ def build_vulnerability(
     )
 
     raw_scores = parse_ratings(vuln.get("ratings") or [], csaf_version)
-    scores: List[Score] = []
-    if score_product_ids and raw_scores:
-        for body in raw_scores:
-            scores.append(
-                Score(
-                    products=score_product_ids,
-                    cvss_v2=body.get("cvss_v2"),
-                    cvss_v3=body.get("cvss_v3"),
-                    cvss_v4=body.get("cvss_v4"),
-                )
-            )
+    scores = _build_scores(raw_scores, score_product_ids)
 
     flag_models = [Flag(label=f["label"], product_ids=f["product_ids"]) for f in flags]
     reference_models = [
         Reference(summary=r["summary"], url=r["url"], category=r.get("category"))
         for r in references
     ]
+    remediations = _build_remediations(vuln, product_status.get("known_affected") or [])
 
-    cve = vuln.get("id") if str(vuln.get("id", "")).startswith("CVE") else None
+    raw_id = str(vuln.get("id") or "")
+    cve = raw_id if raw_id.upper().startswith("CVE-") else None
     title = vuln.get("bom-ref") or vuln.get("id") or "vulnerability"
+
+    # §6.1.27.8: a CSAF vulnerability item must carry at least one of cve/ids.
+    # When neither the CVE nor the reference builder produced an identifier
+    # (e.g. distro advisories like DLA-4485-1 stored only in the title/id),
+    # synthesize one from the raw id or title so the item is never anonymous.
+    if not cve and not ids:
+        synthetic = synthesize_id(raw_id) or synthesize_id(title)
+        if synthetic:
+            ids = [synthetic]
 
     return Vulnerability(
         cve=cve,
@@ -150,6 +152,54 @@ def build_vulnerability(
         references=reference_models,
         ids=ids,
         acknowledgments=_build_acknowledgements(vuln.get("source") or {}),
-        discovery_date=vuln.get("published") or vuln.get("updated"),
-        disclosure_date=vuln.get("published") or vuln.get("updated"),
+        # ``published`` is the public disclosure date. dep-scan has no separate
+        # signal for when the issue was first *discovered*, so discovery_date is
+        # left unset rather than fabricated as a copy of the disclosure date.
+        disclosure_date=to_csaf_datetime(vuln.get("published") or vuln.get("updated")),
+        remediations=remediations,
     )
+
+
+def _build_remediations(vuln: Dict[str, Any], affected_ids: List[str]) -> List[Dict[str, Any]]:
+    """Build the action statement CSAF requires for ``known_affected`` products.
+
+    The CSAF VEX profile (§6.1.27.10) mandates a remediation for every
+    ``known_affected`` product. When the VDR carries a fix recommendation we
+    emit a ``vendor_fix``; otherwise the honest statement is ``none_available``.
+    """
+    if not affected_ids:
+        return []
+    product_ids = sorted(set(affected_ids))
+    recommendation = (vuln.get("recommendation") or "").replace("\n", " ").strip()
+    if recommendation:
+        return [{"category": "vendor_fix", "details": recommendation, "product_ids": product_ids}]
+    return [
+        {
+            "category": "none_available",
+            "details": "No remediation information is available from dep-scan for this product.",
+            "product_ids": product_ids,
+        }
+    ]
+
+
+def _build_scores(raw_scores: List[Dict[str, Any]], score_product_ids: List[str]) -> List[Score]:
+    """Assemble CVSS scores, keeping at most one per CVSS version.
+
+    §6.1.7 forbids multiple scores of the same CVSS version for the same
+    product. Because every score here targets the same ``score_product_ids``
+    set, we keep only the first body seen per family (v2/v3/v4). The first
+    body wins because :func:`parse_ratings` preserves VDR ordering, which
+    places the primary source first.
+    """
+    if not score_product_ids or not raw_scores:
+        return []
+    seen_families: set = set()
+    scores: List[Score] = []
+    for body in raw_scores:
+        for family in ("cvss_v2", "cvss_v3", "cvss_v4"):
+            content = body.get(family)
+            if not content or family in seen_families:
+                continue
+            seen_families.add(family)
+            scores.append(Score(products=score_product_ids, **{family: content}))
+    return scores

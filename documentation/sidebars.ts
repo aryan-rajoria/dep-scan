@@ -57,7 +57,8 @@ const sidebars: SidebarsConfig = {
       label: 'Reports and Compliance',
       items: [
         'output/vdr-guide',
-        'output/vex-csaf-guide'
+        'output/vex-csaf-guide',
+        'output/validate-command'
       ]
     },
     'env-var',
